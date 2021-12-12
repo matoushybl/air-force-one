@@ -2,10 +2,11 @@
 
 pub mod scd30;
 
+pub mod sps30;
+
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use defmt_rtt as _; // global logger
-use nrf52840_hal as _; // memory layout
 
 use panic_probe as _;
 

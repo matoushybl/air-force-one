@@ -1,5 +1,12 @@
+use core::cell::RefCell;
 use core::convert::TryInto;
+use defmt::{panic, *};
+use embassy::time::{Duration, Timer};
+use embassy::traits::i2c::{AddressMode, I2c, SevenBitAddress};
+use embassy_nrf::twim::{self, Instance, Twim};
+use embassy_nrf::{interrupt, Peripherals};
 use embedded_hal::blocking::i2c::{Read, Write};
+use futures_intrusive::sync::LocalMutex;
 
 const SENSOR_ADDR: u8 = 0x61;
 
@@ -30,25 +37,26 @@ pub struct SensorData {
     pub humidity: f32,
 }
 
-pub struct SCD30<T: Read + Write>(T);
+pub struct SCD30<'a, T>(&'a LocalMutex<T>);
 
-impl<T, E> SCD30<T>
+impl<'a, T> SCD30<'a, T>
 where
-    T: Read<Error = E> + Write<Error = E>,
+    T: I2c<SevenBitAddress>,
 {
-    pub fn init(i2c: T) -> Self {
+    pub fn init(i2c: &'a LocalMutex<T>) -> Self {
         Self(i2c)
     }
 
-    pub fn read_fw_version(&mut self) -> Result<[u8; 2], E> {
+    pub async fn read_fw_version(&mut self) -> Result<[u8; 2], T::Error> {
         let command: u16 = SCD30Command::ReadFWVersion.into();
-        self.0.write(SENSOR_ADDR, &command.to_be_bytes())?;
+        let mut bus = self.0.lock().await;
+        bus.write(SENSOR_ADDR, &command.to_be_bytes()).await?;
         let mut result = [0u8; 2];
-        self.0.read(SENSOR_ADDR, &mut result)?;
+        bus.read(SENSOR_ADDR, &mut result).await?;
         Ok(result)
     }
 
-    pub fn set_measurement_interval(&mut self, seconds: u16) -> Result<(), E> {
+    pub async fn set_measurement_interval(&mut self, seconds: u16) -> Result<(), T::Error> {
         let sensor_command: u16 = SCD30Command::SetInterval.into();
         let sensor_command = sensor_command.to_be_bytes();
         let raw_interval = seconds.to_be_bytes();
@@ -64,12 +72,12 @@ where
         crc.update(&raw_interval);
         command[4] = crc.finish();
 
-        self.0.write(SENSOR_ADDR, &command)?;
+        self.0.lock().await.write(SENSOR_ADDR, &command).await?;
 
         Ok(())
     }
 
-    pub fn start_continuous_measurement(&mut self, pressure: u16) -> Result<(), E> {
+    pub async fn start_continuous_measurement(&mut self, pressure: u16) -> Result<(), T::Error> {
         let sensor_command: u16 = SCD30Command::StartContMeasurement.into();
         let sensor_command = sensor_command.to_be_bytes();
         let raw_pressure = pressure.to_be_bytes();
@@ -85,25 +93,27 @@ where
         crc.update(&raw_pressure);
         command[4] = crc.finish();
 
-        self.0.write(SENSOR_ADDR, &command)?;
+        self.0.lock().await.write(SENSOR_ADDR, &command).await?;
 
         Ok(())
     }
 
-    pub fn get_data_ready(&mut self) -> Result<bool, E> {
+    pub async fn get_data_ready(&mut self) -> Result<bool, T::Error> {
         let command: u16 = SCD30Command::DataReady.into();
-        self.0.write(SENSOR_ADDR, &command.to_be_bytes())?;
+        let mut bus = self.0.lock().await;
+        bus.write(SENSOR_ADDR, &command.to_be_bytes()).await?;
         let mut result = [0u8; 3];
-        self.0.read(SENSOR_ADDR, &mut result)?;
+        bus.read(SENSOR_ADDR, &mut result).await?;
         Ok(u16::from_be_bytes((&result[0..2]).try_into().unwrap()) == 1)
     }
 
-    pub fn read_measurement(&mut self) -> Result<SensorData, E> {
+    pub async fn read_measurement(&mut self) -> Result<SensorData, T::Error> {
         let command: u16 = SCD30Command::ReadMeasurement.into();
-        self.0.write(SENSOR_ADDR, &command.to_be_bytes())?;
+        let mut bus = self.0.lock().await;
+        bus.write(SENSOR_ADDR, &command.to_be_bytes()).await?;
         let mut result = [0u8; 18];
-        self.0.read(SENSOR_ADDR, &mut result)?;
-        defmt::error!("res: {}", result);
+        bus.read(SENSOR_ADDR, &mut result).await?;
+        defmt::trace!("res: {}", result);
         Ok(SensorData {
             co2: Self::slice_to_f32(&result[..6]).unwrap(),
             temperature: Self::slice_to_f32(&result[6..12]).unwrap(),
