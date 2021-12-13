@@ -13,11 +13,16 @@ use embassy::{
     time::{Duration, Timer},
     util::Forever,
 };
+use embassy_hal_common::usb::{
+    usb_serial::{UsbSerial, USB_CLASS_CDC},
+    ClassSet1, State,
+};
 use embassy_nrf::{
     gpio::{Level, Output, OutputDrive},
     interrupt,
     peripherals::{P1_10, TWISPI0, TWISPI1},
     twim::{self, Twim},
+    usbd::UsbPeripheral,
     Peripherals,
 };
 use embedded_graphics::{
@@ -28,10 +33,16 @@ use embedded_graphics::{
     style::TextStyleBuilder,
 };
 use embedded_hal::digital::v2::{OutputPin, StatefulOutputPin};
+use futures::pin_mut;
 use futures_intrusive::sync::LocalMutex;
+use nrf_usbd::Usbd;
 use ssd1306::{
     prelude::{DisplayRotation, DisplaySize128x32, GraphicsMode},
     Builder, I2CDIBuilder,
+};
+use usb_device::{
+    class_prelude::UsbBusAllocator,
+    device::{UsbDeviceBuilder, UsbVidPid},
 };
 
 // led 1 - p1.15 - red
@@ -81,7 +92,7 @@ async fn display_task(
             .unwrap();
 
         disp.flush().unwrap();
-        defmt::warn!("displaying {}", data);
+        defmt::warn!("DISP: displaying {}", data);
         Timer::after(Duration::from_millis(500)).await;
     }
 }
@@ -95,7 +106,7 @@ async fn co2_task(
         if sensor.get_data_ready().await.unwrap() {
             let measurement = sensor.read_measurement().await.unwrap();
             state.lock(|data| data.set(measurement.co2));
-            defmt::info!("wtf: {}", measurement.co2);
+            defmt::info!("SCD30: co2 {}", measurement.co2);
         }
     }
 }
@@ -104,28 +115,63 @@ async fn co2_task(
 async fn pm_task(mut sensor: Sps30<'static, Twim<'static, TWISPI0>>) {
     let version = defmt::unwrap!(sensor.read_version().await);
 
-    defmt::error!("version {:x}", version);
+    defmt::error!("SPS30: version {:x}", version);
 
     defmt::unwrap!(sensor.start_measurement().await);
 
     Timer::after(Duration::from_millis(2000)).await;
-    defmt::error!("tf");
 
     loop {
         Timer::after(Duration::from_millis(500)).await;
-        let ready = defmt::unwrap!(sensor.is_ready().await);
-        defmt::error!("rdy {:x}", ready);
 
-        if ready {
-            defmt::error!("dredy");
-
+        if defmt::unwrap!(sensor.is_ready().await) {
             let data = defmt::unwrap!(sensor.read_measured_data().await);
-            defmt::error!("data: {}", data);
+            defmt::info!("SPS30: data: {}", data);
         }
     }
 }
 
+#[embassy::task]
+async fn report_task(
+    usb: embassy_hal_common::usb::Usb<
+        'static,
+        Usbd<UsbPeripheral<'static>>,
+        ClassSet1<
+            Usbd<UsbPeripheral<'static>>,
+            UsbSerial<'static, 'static, Usbd<UsbPeripheral<'static>>>,
+        >,
+        interrupt::USBD,
+    >,
+    state: &'static CriticalSectionMutex<Cell<f32>>,
+) {
+    use core::fmt::Write;
+    use embassy::io::AsyncWriteExt;
+    pin_mut!(usb);
+    let (mut _read_interface, mut write_interface) = usb.as_ref().take_serial_0();
+    loop {
+        Timer::after(Duration::from_millis(500)).await;
+        let mut buf = ArrayString::<[_; 32]>::new();
+        let data = state.lock(|data| data.get());
+        write!(&mut buf, "{} ppm\r\n", data).unwrap();
+        defmt::unwrap!(write_interface.write_all((*buf).as_bytes()).await);
+    }
+}
+
 static SENSOR_BUS: Forever<LocalMutex<Twim<'static, TWISPI0>>> = Forever::new();
+static USB_READ_BUFFER: Forever<[u8; 128]> = Forever::new();
+static USB_WRITE_BUFFER: Forever<[u8; 128]> = Forever::new();
+static USB_ALLOCATOR: Forever<UsbBusAllocator<Usbd<UsbPeripheral>>> = Forever::new();
+static USB_STATE: Forever<
+    State<
+        'static,
+        Usbd<UsbPeripheral<'static>>,
+        ClassSet1<
+            Usbd<UsbPeripheral<'static>>,
+            UsbSerial<'static, 'static, Usbd<UsbPeripheral<'static>>>,
+        >,
+        interrupt::USBD,
+    >,
+> = Forever::new();
 static STATE: Forever<CriticalSectionMutex<Cell<f32>>> = Forever::new();
 
 #[embassy::main]
@@ -156,9 +202,44 @@ async fn main(spawner: Spawner, p: Peripherals) {
         display_twi_config,
     );
 
+    let bus = USB_ALLOCATOR.put(Usbd::new(UsbPeripheral::new(p.USBD)));
+
+    defmt::error!("Hello world");
+
+    let read_buf = USB_READ_BUFFER.put([0u8; 128]);
+    let write_buf = USB_WRITE_BUFFER.put([0u8; 128]);
+    let serial = UsbSerial::new(bus, read_buf, write_buf);
+
+    let device = UsbDeviceBuilder::new(bus, UsbVidPid(0x16c0, 0x27dd))
+        .manufacturer("Fake company")
+        .product("Serial port")
+        .serial_number("TEST")
+        .device_class(USB_CLASS_CDC)
+        .build();
+
+    // device.bus().enable();
+
+    let state = USB_STATE.put(embassy_hal_common::usb::State::new());
+
+    // sprinkle some unsafe
+
+    let usb =
+        unsafe { embassy_hal_common::usb::Usb::new(state, device, serial, interrupt::take!(USBD)) };
+
+    unsafe {
+        (*embassy_nrf::pac::USBD::ptr()).intenset.write(|w| {
+            w.sof().set_bit();
+            w.usbevent().set_bit();
+            w.ep0datadone().set_bit();
+            w.ep0setup().set_bit();
+            w.usbreset().set_bit()
+        })
+    };
+
     let state = STATE.put(CriticalSectionMutex::new(Cell::new(0.0f32)));
     defmt::unwrap!(spawner.spawn(co2_task(co2_sensor, state)));
     defmt::unwrap!(spawner.spawn(display_task(display_twi, state)));
     defmt::unwrap!(spawner.spawn(pm_task(pm_sensor)));
+    defmt::unwrap!(spawner.spawn(report_task(usb, state)));
     blinky_task(led).await;
 }

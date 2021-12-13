@@ -6,12 +6,12 @@ edition = "2021"
 version = "0.1.0"
 
 [patch.crates-io]
-embassy = { git = "https://github.com/matoushybl/embassy.git", branch = "master"}
-embassy-nrf = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
-embassy-net = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
-embassy-hal-common = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
-embassy-traits = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
-embassy-macros = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
+embassy = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb"}
+embassy-nrf = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
+embassy-net = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
+embassy-hal-common = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
+embassy-traits = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
+embassy-macros = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
 
 [dependencies]
 embassy = { version = "0.1.0", features = ["defmt"] }
@@ -19,7 +19,7 @@ embassy-traits = { version = "0.1.0", features = ["defmt"] }
 embassy-hal-common = {version = "0.1.0" }
 embassy-net = { version = "0.1.0", default-features = false, features = ["defmt", "tcp", "medium-ethernet", "pool-16"] }
 embassy-macros = { version = "0.1.0" }
-embassy-nrf = { version = "0.1.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote"] }
+embassy-nrf = { version = "0.1.0", features = ["defmt", "nrf52840", "time-driver-rtc1", "gpiote", "unstable-pac"] }
 
 defmt = "0.3.0"
 defmt-rtt = "0.3.0"
@@ -32,6 +32,9 @@ ssd1306 = "0.5.1"
 embedded-graphics = "0.6.2"
 arrayvec = { version = "0.5.2", default-features = false }
 futures-intrusive = { version = "^0.4", default-features = false }
+usb-device = "0.2.8"
+nrf-usbd = "0.1.0"
+futures = { version = "0.3.17", default-features = false, features = ["async-await"] }
 
 crc_all = "0.2.0"
 

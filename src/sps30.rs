@@ -1,3 +1,7 @@
+use defmt::Format;
+use embassy_traits::i2c::{I2c, SevenBitAddress};
+use futures_intrusive::sync::LocalMutex;
+
 pub enum Sps30Command {
     StartMeasurement,
     StopMeasurement,
@@ -102,7 +106,7 @@ where
         self.read(Sps30Command::ReadMeasuredValues, &mut buffer, false)
             .await?;
 
-        defmt::error!("SPS30: raw data from sensor: {:x}", &buffer[..]);
+        defmt::trace!("SPS30: raw data from sensor: {:x}", &buffer[..]);
         Ok(AirInfo {
             mass_pm1_0: f32::from_be_bytes(buffer[..4].try_into().unwrap()),
             mass_pm2_5: f32::from_be_bytes(buffer[6..10].try_into().unwrap()),
@@ -176,12 +180,6 @@ where
         crc.finish()
     }
 }
-
-use core::cell::RefCell;
-
-use defmt::Format;
-use embassy_traits::i2c::{I2c, SevenBitAddress};
-use futures_intrusive::sync::LocalMutex;
 
 #[derive(Format)]
 pub struct AirInfo {
