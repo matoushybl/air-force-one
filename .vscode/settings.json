@@ -1,9 +1,27 @@
 {
-    // override the default setting (`cargo check --all-targets`) which produces the following error
-    // "can't find crate for `test`" when the default compilation target is a no_std target
-    // with these changes RA will call `cargo check --bins` on save
+    "editor.formatOnSave": true,
+    "rust-analyzer.assist.importEnforceGranularity": true,
+    "rust-analyzer.assist.importGranularity": "module",
+    "rust-analyzer.checkOnSave.allFeatures": false,
     "rust-analyzer.checkOnSave.allTargets": false,
-    "rust-analyzer.checkOnSave.extraArgs": [
-        "--bins"
-    ]
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "rust-analyzer.cargo.noDefaultFeatures": true,
+    "rust-analyzer.experimental.procAttrMacros": false,
+    "rust-analyzer.checkOnSave.noDefaultFeatures": true,
+    "rust-analyzer.cargo.target": "thumbv7em-none-eabi",
+    "rust-analyzer.cargo.features": [],
+    "rust-analyzer.linkedProjects": [
+        // Declare for the target you wish to develop
+        "firmware/Cargo.toml",
+        // "telegraf-bridge/Cargo.toml",
+        // "shared/Cargo.toml",
+    ],
+    "rust-analyzer.procMacro.enable": true,
+    "rust-analyzer.cargo.runBuildScripts": true,
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/target/**": true
+    },
+    "git.ignoreLimitWarning": true
 }

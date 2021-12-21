@@ -36,6 +36,7 @@ use embedded_hal::digital::v2::{OutputPin, StatefulOutputPin};
 use futures::pin_mut;
 use futures_intrusive::sync::LocalMutex;
 use nrf_usbd::Usbd;
+use shared::AirQuality;
 use ssd1306::{
     prelude::{DisplayRotation, DisplaySize128x32, GraphicsMode},
     Builder, I2CDIBuilder,
@@ -64,7 +65,7 @@ async fn blinky_task(mut led: Output<'static, P1_10>) {
 #[embassy::task]
 async fn display_task(
     twim: Twim<'static, TWISPI1>,
-    state: &'static CriticalSectionMutex<Cell<f32>>,
+    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
 ) {
     use core::fmt::Write;
     let interface = I2CDIBuilder::new().init(twim);
@@ -85,7 +86,7 @@ async fn display_task(
 
         let mut buf = ArrayString::<[_; 32]>::new();
         let data = state.lock(|data| data.get());
-        write!(&mut buf, "{} ppm", data).unwrap();
+        write!(&mut buf, "{} ppm", data.co2_concentration).unwrap();
         Text::new(&mut buf, Point::zero())
             .into_styled(text_style)
             .draw(&mut disp)
@@ -100,19 +101,28 @@ async fn display_task(
 #[embassy::task]
 async fn co2_task(
     mut sensor: SCD30<'static, Twim<'static, TWISPI0>>,
-    state: &'static CriticalSectionMutex<Cell<f32>>,
+    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
 ) {
     loop {
         if sensor.get_data_ready().await.unwrap() {
             let measurement = sensor.read_measurement().await.unwrap();
-            state.lock(|data| data.set(measurement.co2));
+            state.lock(|data| {
+                let mut raw = data.get();
+                raw.co2_concentration = measurement.co2;
+                raw.temperature = measurement.temperature;
+                raw.humidity = measurement.humidity;
+                data.set(raw)
+            });
             defmt::info!("SCD30: co2 {}", measurement.co2);
         }
     }
 }
 
 #[embassy::task]
-async fn pm_task(mut sensor: Sps30<'static, Twim<'static, TWISPI0>>) {
+async fn pm_task(
+    mut sensor: Sps30<'static, Twim<'static, TWISPI0>>,
+    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
+) {
     let version = defmt::unwrap!(sensor.read_version().await);
 
     defmt::error!("SPS30: version {:x}", version);
@@ -125,8 +135,22 @@ async fn pm_task(mut sensor: Sps30<'static, Twim<'static, TWISPI0>>) {
         Timer::after(Duration::from_millis(500)).await;
 
         if defmt::unwrap!(sensor.is_ready().await) {
-            let data = defmt::unwrap!(sensor.read_measured_data().await);
-            defmt::info!("SPS30: data: {}", data);
+            let measured = defmt::unwrap!(sensor.read_measured_data().await);
+            state.lock(|data| {
+                let mut raw = data.get();
+                raw.mass_pm1_0 = measured.mass_pm1_0;
+                raw.mass_pm2_5 = measured.mass_pm2_5;
+                raw.mass_pm4_0 = measured.mass_pm4_0;
+                raw.mass_pm10 = measured.mass_pm10;
+                raw.number_pm0_5 = measured.number_pm0_5;
+                raw.number_pm1_0 = measured.number_pm1_0;
+                raw.number_pm2_5 = measured.number_pm2_5;
+                raw.number_pm4_0 = measured.number_pm4_0;
+                raw.number_pm10 = measured.number_pm10;
+                raw.typical_particulate_matter_size = measured.typical_size;
+                data.set(raw)
+            });
+            defmt::error!("SPS30: data: {}", measured);
         }
     }
 }
@@ -142,18 +166,20 @@ async fn report_task(
         >,
         interrupt::USBD,
     >,
-    state: &'static CriticalSectionMutex<Cell<f32>>,
+    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
 ) {
-    use core::fmt::Write;
     use embassy::io::AsyncWriteExt;
     pin_mut!(usb);
     let (mut _read_interface, mut write_interface) = usb.as_ref().take_serial_0();
+    let mut buffer = [0u8; 100];
     loop {
         Timer::after(Duration::from_millis(500)).await;
-        let mut buf = ArrayString::<[_; 32]>::new();
         let data = state.lock(|data| data.get());
-        write!(&mut buf, "{} ppm\r\n", data).unwrap();
-        defmt::unwrap!(write_interface.write_all((*buf).as_bytes()).await);
+        if let Ok(raw) = postcard::to_slice_cobs(&data, &mut buffer) {
+            defmt::unwrap!(write_interface.write_all(&raw).await);
+        } else {
+            defmt::error!("failed to serialize the state to raw data.");
+        }
     }
 }
 
@@ -172,7 +198,7 @@ static USB_STATE: Forever<
         interrupt::USBD,
     >,
 > = Forever::new();
-static STATE: Forever<CriticalSectionMutex<Cell<f32>>> = Forever::new();
+static STATE: Forever<CriticalSectionMutex<Cell<AirQuality>>> = Forever::new();
 
 #[embassy::main]
 async fn main(spawner: Spawner, p: Peripherals) {
@@ -213,11 +239,9 @@ async fn main(spawner: Spawner, p: Peripherals) {
     let device = UsbDeviceBuilder::new(bus, UsbVidPid(0x16c0, 0x27dd))
         .manufacturer("Fake company")
         .product("Serial port")
-        .serial_number("TEST")
+        .serial_number("AFO")
         .device_class(USB_CLASS_CDC)
         .build();
-
-    // device.bus().enable();
 
     let state = USB_STATE.put(embassy_hal_common::usb::State::new());
 
@@ -236,10 +260,10 @@ async fn main(spawner: Spawner, p: Peripherals) {
         })
     };
 
-    let state = STATE.put(CriticalSectionMutex::new(Cell::new(0.0f32)));
+    let state = STATE.put(CriticalSectionMutex::new(Cell::new(AirQuality::default())));
     defmt::unwrap!(spawner.spawn(co2_task(co2_sensor, state)));
     defmt::unwrap!(spawner.spawn(display_task(display_twi, state)));
-    defmt::unwrap!(spawner.spawn(pm_task(pm_sensor)));
+    defmt::unwrap!(spawner.spawn(pm_task(pm_sensor, state)));
     defmt::unwrap!(spawner.spawn(report_task(usb, state)));
     blinky_task(led).await;
 }

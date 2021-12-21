@@ -1,0 +1,52 @@
+version: "3"
+
+# More info at https://github.com/pi-hole/docker-pi-hole/ and https://docs.pi-hole.net/
+services:
+  influxdb2:
+    image: influxdb:latest
+    container_name: influxdb2
+    networks:
+      - monitoring
+    ports:
+      - "8086:8086"
+    volumes:
+      - type: bind
+        source: /home/pi/data/influxdb2/data
+        target: /var/lib/influxdb2
+      - type: bind
+        source: /home/matous/data/influxdb2/config
+        target: /etc/influxdb2
+      # environment:
+      # - DOCKER_INFLUXDB_INIT_MODE=setup
+      # - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      # - DOCKER_INFLUXDB_INIT_PASSWORD=admin
+      # - DOCKER_INFLUXDB_INIT_ORG=home
+      # - DOCKER_INFLUXDB_INIT_BUCKET=home
+      # - DOCKER_INFLUXDB_INIT_RETENTION=1y
+    restart: always
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    networks:
+      - monitoring
+    ports:
+      - "8092:8092"
+      - "8094:8094"
+      - "8125:8125"
+    volumes:
+      - /home/pi/data/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /home/pi/data/telegraf/log/:/var/log/telegraf/
+    restart: always
+  grafana8:
+    image: grafana/grafana:latest
+    networks:
+      - monitoring
+    container_name: grafana8
+    volumes:
+      - /home/pi/data/grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    restart: always
+networks:
+  monitoring:
+    driver: bridge

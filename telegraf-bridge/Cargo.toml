@@ -1,0 +1,12 @@
+[package]
+name = "afo-telegraf"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+telegraf = "*"
+serial2 = "0.1.6"
+postcard = "0.7.2"
+shared = { path = "../shared", features = ["std"] }

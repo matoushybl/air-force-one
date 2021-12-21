@@ -1,11 +1,5 @@
-use core::cell::RefCell;
 use core::convert::TryInto;
-use defmt::{panic, *};
-use embassy::time::{Duration, Timer};
-use embassy::traits::i2c::{AddressMode, I2c, SevenBitAddress};
-use embassy_nrf::twim::{self, Instance, Twim};
-use embassy_nrf::{interrupt, Peripherals};
-use embedded_hal::blocking::i2c::{Read, Write};
+use embassy::traits::i2c::{I2c, SevenBitAddress};
 use futures_intrusive::sync::LocalMutex;
 
 const SENSOR_ADDR: u8 = 0x61;
