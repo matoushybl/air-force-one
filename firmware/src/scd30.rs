@@ -10,6 +10,7 @@ pub enum SCD30Command {
     DataReady,
     SetInterval,
     ReadMeasurement,
+    SetTemperatureOffset,
 }
 
 impl From<SCD30Command> for u16 {
@@ -20,6 +21,7 @@ impl From<SCD30Command> for u16 {
             SCD30Command::DataReady => 0x0202,
             SCD30Command::ReadMeasurement => 0x0300,
             SCD30Command::SetInterval => 0x4600,
+            SCD30Command::SetTemperatureOffset => 0x5403,
         }
     }
 }
@@ -113,6 +115,34 @@ where
             temperature: Self::slice_to_f32(&result[6..12]).unwrap(),
             humidity: Self::slice_to_f32(&result[12..]).unwrap(),
         })
+    }
+
+    pub async fn get_temperature_offset(&mut self) -> Result<u16, T::Error> {
+        let command: u16 = SCD30Command::SetTemperatureOffset.into();
+        let mut bus = self.0.lock().await;
+        bus.write(SENSOR_ADDR, &command.to_be_bytes()).await?;
+        let mut result = [0u8; 3];
+        bus.read(SENSOR_ADDR, &mut result).await?;
+        Ok(u16::from_be_bytes((&result[0..2]).try_into().unwrap()))
+    }
+
+    pub async fn set_temperature_offset(&mut self, degrees: f32) -> Result<(), T::Error> {
+        let sensor_command: u16 = SCD30Command::SetTemperatureOffset.into();
+        let sensor_command = sensor_command.to_be_bytes();
+        let raw_offset = ((degrees * 100.0) as u16).to_be_bytes();
+        let mut command: [u8; 5] = [
+            sensor_command[0],
+            sensor_command[1],
+            raw_offset[0],
+            raw_offset[1],
+            0,
+        ];
+
+        let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
+        crc.update(&raw_offset);
+        command[4] = crc.finish();
+
+        self.0.lock().await.write(SENSOR_ADDR, &command).await
     }
 
     // TODO check CRC
