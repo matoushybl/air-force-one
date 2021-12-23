@@ -106,18 +106,34 @@ where
         self.read(Sps30Command::ReadMeasuredValues, &mut buffer, false)
             .await?;
 
-        defmt::trace!("SPS30: raw data from sensor: {:x}", &buffer[..]);
+        fn process(buffer: &[u8]) -> f32 {
+            let raw = [buffer[0], buffer[1], buffer[3], buffer[4]];
+            let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
+            crc.update(&buffer[..2]);
+            let crc1 = crc.finish();
+
+            let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
+            crc.update(&buffer[3..5]);
+            let crc2 = crc.finish();
+
+            if crc1 != buffer[2] || crc2 != buffer[5] {
+                defmt::error!("crc invalid");
+            }
+            f32::from_be_bytes(raw)
+        }
+
+        defmt::info!("SPS30: raw data from sensor: {:x}", &buffer[..]);
         Ok(AirInfo {
-            mass_pm1_0: f32::from_be_bytes(buffer[..4].try_into().unwrap()),
-            mass_pm2_5: f32::from_be_bytes(buffer[6..10].try_into().unwrap()),
-            mass_pm4_0: f32::from_be_bytes(buffer[12..16].try_into().unwrap()),
-            mass_pm10: f32::from_be_bytes(buffer[18..22].try_into().unwrap()),
-            number_pm0_5: f32::from_be_bytes(buffer[24..28].try_into().unwrap()),
-            number_pm1_0: f32::from_be_bytes(buffer[30..34].try_into().unwrap()),
-            number_pm2_5: f32::from_be_bytes(buffer[36..40].try_into().unwrap()),
-            number_pm4_0: f32::from_be_bytes(buffer[42..46].try_into().unwrap()),
-            number_pm10: f32::from_be_bytes(buffer[48..52].try_into().unwrap()),
-            typical_size: f32::from_be_bytes(buffer[54..58].try_into().unwrap()),
+            mass_pm1_0: process(&buffer[..6]),
+            mass_pm2_5: process(&buffer[6..]),
+            mass_pm4_0: process(&buffer[12..]),
+            mass_pm10: process(&buffer[18..]),
+            number_pm0_5: process(&buffer[24..]),
+            number_pm1_0: process(&buffer[30..]),
+            number_pm2_5: process(&buffer[36..]),
+            number_pm4_0: process(&buffer[42..]),
+            number_pm10: process(&buffer[48..]),
+            typical_size: process(&buffer[54..]),
         })
     }
 

@@ -1,2 +1,11 @@
 target
 shared/Cargo.lock
+docker/volumes/data/grafana/alerting/
+docker/volumes/data/grafana/csv/
+docker/volumes/data/grafana/plugins/
+docker/volumes/data/grafana/png/
+docker/volumes/data/grafana/grafana.db
+docker/volumes/data/telegraf/log/
+# docker/volumes/data/influxdb2/config/
+docker/volumes/data/influxdb2/data/engine/
+docker/volumes/data/influxdb2/data/influx*

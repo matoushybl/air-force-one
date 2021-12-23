@@ -40,7 +40,7 @@ struct AirQualityMetric {
 fn main() {
     println!("Hello, world!");
 
-    let mut client = Client::new("tcp://10.15.0.15:8094").unwrap();
+    let mut client = Client::new("tcp://localhost:8094").unwrap();
     let point = CarbonDioxide {
         field1: 1800.234,
         tag1: "afo1".to_string(),

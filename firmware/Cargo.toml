@@ -37,6 +37,7 @@ nrf-usbd = "0.1.0"
 futures = { version = "0.3.17", default-features = false, features = ["async-await"] }
 postcard = "0.7.2"
 shared = { path = "../shared", features = ["defmt_format"] }
+# nrf-smartled = { version = "0.4.0", features = ["52840"]}
 
 crc_all = "0.2.0"
 

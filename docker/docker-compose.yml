@@ -11,10 +11,10 @@ services:
       - "8086:8086"
     volumes:
       - type: bind
-        source: /home/pi/data/influxdb2/data
+        source: ./volumes/data/influxdb2/data
         target: /var/lib/influxdb2
       - type: bind
-        source: /home/matous/data/influxdb2/config
+        source: ./volumes/data/influxdb2/config
         target: /etc/influxdb2
       # environment:
       # - DOCKER_INFLUXDB_INIT_MODE=setup
@@ -34,8 +34,8 @@ services:
       - "8094:8094"
       - "8125:8125"
     volumes:
-      - /home/pi/data/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-      - /home/pi/data/telegraf/log/:/var/log/telegraf/
+      - ./volumes/data/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ./volumes/data/telegraf/log/:/var/log/telegraf/
     restart: always
   grafana8:
     image: grafana/grafana:latest
@@ -43,7 +43,7 @@ services:
       - monitoring
     container_name: grafana8
     volumes:
-      - /home/pi/data/grafana:/var/lib/grafana
+      - ./volumes/data/grafana:/var/lib/grafana
     ports:
       - "3000:3000"
     restart: always
