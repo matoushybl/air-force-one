@@ -27,6 +27,7 @@ pub struct AirQuality {
     pub number_pm10: f32,
     /// Typical Particle Size [μm]
     pub typical_particulate_matter_size: f32,
+    pub voc_index: u16,
 }
 
 #[cfg(test)]
@@ -50,6 +51,7 @@ mod tests {
             number_pm4_0: 2.0,
             number_pm10: 2.0,
             typical_particulate_matter_size: 1.3,
+            voc_index: 100,
         };
         let mut buffer = [0u8; 100];
         let output = to_slice_cobs(&data, &mut buffer).unwrap();

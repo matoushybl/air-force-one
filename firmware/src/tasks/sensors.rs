@@ -8,7 +8,37 @@ use embassy_nrf::twim::Twim;
 use shared::AirQuality;
 
 use crate::scd30::SCD30;
+use crate::sgp40::Sgp40;
 use crate::sps30::Sps30;
+
+#[embassy::task]
+pub async fn voc_task(
+    mut sensor: Sgp40<'static, Twim<'static, peripherals::TWISPI0>>,
+    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
+) {
+    defmt::error!(
+        "voc version: {=u64:x}",
+        defmt::unwrap!(sensor.get_serial_number().await)
+    );
+
+    loop {
+        let (temperature, humidity) =
+            state.lock(|state| (state.get().temperature, state.get().humidity));
+        if humidity > 1.0 {
+            if let Ok(voc) = sensor.measure_voc_index(humidity, temperature).await {
+                state.lock(|state| {
+                    let mut s = state.get();
+                    s.voc_index = voc;
+                    state.set(s);
+                });
+                defmt::error!("voc: {}", voc);
+            } else {
+                defmt::error!("Failed to read data from VOC.");
+            }
+        }
+        Timer::after(Duration::from_secs(1)).await;
+    }
+}
 
 #[embassy::task]
 pub async fn co2_task(

@@ -5,7 +5,9 @@ pub mod tasks;
 
 pub mod scd30;
 
+pub mod sgp40;
 pub mod sps30;
+pub mod vocalg;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 

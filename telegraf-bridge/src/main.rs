@@ -33,6 +33,7 @@ struct AirQualityMetric {
     pub number_pm10: f32,
     /// Typical Particle Size [μm]
     pub typical_particulate_matter_size: f32,
+    pub voc_index: i32,
     #[telegraf(tag)]
     tag1: String,
 }
@@ -73,6 +74,7 @@ fn main() {
                         number_pm4_0: decoded.number_pm4_0,
                         number_pm10: decoded.number_pm10,
                         typical_particulate_matter_size: decoded.typical_particulate_matter_size,
+                        voc_index: decoded.voc_index as i32,
                     };
                     client.write(&point).unwrap();
                 }

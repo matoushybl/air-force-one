@@ -39,6 +39,9 @@ postcard = "0.7.2"
 shared = { path = "../shared", features = ["defmt_format"] }
 # nrf-smartled = { version = "0.4.0", features = ["52840"]}
 
+fixed = "1"
+fixed-sqrt = "0.2"
+
 crc_all = "0.2.0"
 
 # cargo build/run

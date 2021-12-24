@@ -4,6 +4,7 @@
 
 use core::cell::Cell;
 
+use air_force_one::sgp40::Sgp40;
 use air_force_one::{self as _, scd30::SCD30, sps30::Sps30};
 use air_force_one::{tasks, ButtonEvent, Page};
 
@@ -105,6 +106,7 @@ async fn main(spawner: Spawner, p: Peripherals) {
 
     let co2_sensor = SCD30::init(sensor_bus);
     let pm_sensor = Sps30::new(sensor_bus);
+    let voc_sensor = Sgp40::init(sensor_bus);
 
     let display_twi_config = twim::Config::default();
     let display_twi_irq = interrupt::take!(SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1);
@@ -154,6 +156,7 @@ async fn main(spawner: Spawner, p: Peripherals) {
     let page = PAGE.put(CriticalSectionMutex::new(Cell::new(Page::Basic)));
     defmt::unwrap!(spawner.spawn(tasks::sensors::co2_task(co2_sensor, state)));
     defmt::unwrap!(spawner.spawn(tasks::sensors::pm_task(pm_sensor, state)));
+    defmt::unwrap!(spawner.spawn(tasks::sensors::voc_task(voc_sensor, state)));
     defmt::unwrap!(spawner.spawn(tasks::display::render(display_twi, state, page)));
     defmt::unwrap!(spawner.spawn(tasks::display::navigation(receiver, page)));
     defmt::unwrap!(spawner.spawn(tasks::usb::communication(usb, state)));
