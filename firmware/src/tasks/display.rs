@@ -91,8 +91,8 @@ pub async fn render(
             .unwrap(),
             Page::Voc => write!(
                 &mut buf,
-                "size: {:.1}",
-                data.typical_particulate_matter_size
+                "size: {:.1}\nvoc:  {}",
+                data.typical_particulate_matter_size, data.voc_index,
             )
             .unwrap(),
         }

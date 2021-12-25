@@ -31,7 +31,7 @@ pub async fn voc_task(
                     s.voc_index = voc;
                     state.set(s);
                 });
-                defmt::error!("voc: {}", voc);
+                defmt::info!("voc: {}", voc);
             } else {
                 defmt::error!("Failed to read data from VOC.");
             }
