@@ -1,12 +1,14 @@
 #![no_main]
 #![no_std]
 #![feature(type_alias_impl_trait)]
+#![feature(alloc_error_handler)]
+#![allow(incomplete_features)]
 
 use core::cell::Cell;
 
 use air_force_one::sgp40::Sgp40;
 use air_force_one::{self as _, scd30::SCD30, sps30::Sps30};
-use air_force_one::{tasks, ButtonEvent, Page};
+use air_force_one::{tasks, ButtonEvent, Page, StaticSerialClassSet1, StaticUsb};
 
 use embassy::blocking_mutex::kind::Noop;
 use embassy::channel::mpsc::{self, Channel};
@@ -18,7 +20,7 @@ use embassy::{
 };
 use embassy_hal_common::usb::{
     usb_serial::{UsbSerial, USB_CLASS_CDC},
-    ClassSet1, State,
+    State,
 };
 use embassy_nrf::gpio::{Input, Pull};
 use embassy_nrf::gpiote::InputChannel;
@@ -30,8 +32,9 @@ use embassy_nrf::{
     usbd::UsbPeripheral,
     Peripherals,
 };
-use embedded_hal::digital::v2::{OutputPin, StatefulOutputPin};
 use futures_intrusive::sync::LocalMutex;
+use nrf_softdevice::ble::{gatt_server, peripheral};
+use nrf_softdevice::{raw, Softdevice};
 use nrf_usbd::Usbd;
 use shared::AirQuality;
 use usb_device::{
@@ -43,17 +46,8 @@ static SENSOR_BUS: Forever<LocalMutex<Twim<'static, TWISPI0>>> = Forever::new();
 static USB_READ_BUFFER: Forever<[u8; 128]> = Forever::new();
 static USB_WRITE_BUFFER: Forever<[u8; 128]> = Forever::new();
 static USB_ALLOCATOR: Forever<UsbBusAllocator<Usbd<UsbPeripheral>>> = Forever::new();
-static USB_STATE: Forever<
-    State<
-        'static,
-        Usbd<UsbPeripheral<'static>>,
-        ClassSet1<
-            Usbd<UsbPeripheral<'static>>,
-            UsbSerial<'static, 'static, Usbd<UsbPeripheral<'static>>>,
-        >,
-        interrupt::USBD,
-    >,
-> = Forever::new();
+static USB_STATE: Forever<State<'static, StaticUsb, StaticSerialClassSet1, interrupt::USBD>> =
+    Forever::new();
 static STATE: Forever<CriticalSectionMutex<Cell<AirQuality>>> = Forever::new();
 static PAGE: Forever<CriticalSectionMutex<Cell<Page>>> = Forever::new();
 static BUTTON_EVENTS: Forever<Channel<Noop, ButtonEvent, 1>> = Forever::new();
@@ -66,9 +60,143 @@ static BUTTON_EVENTS: Forever<Channel<Noop, ButtonEvent, 1>> = Forever::new();
 // next - p0.24
 // ok - p.025
 
-#[embassy::main]
+#[embassy::task]
+async fn softdevice_task(sd: &'static Softdevice) {
+    sd.run().await;
+}
+
+#[nrf_softdevice::gatt_service(uuid = "180f")]
+struct BatteryService {
+    #[characteristic(uuid = "2a19", read, notify)]
+    battery_level: u8,
+}
+
+#[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
+struct FooService {
+    #[characteristic(
+        uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38",
+        read,
+        write,
+        notify,
+        indicate
+    )]
+    foo: u16,
+}
+
+#[nrf_softdevice::gatt_server]
+struct Server {
+    bas: BatteryService,
+    foo: FooService,
+}
+
+#[embassy::task]
+async fn bluetooth_task(sd: &'static Softdevice) {
+    let server: Server = defmt::unwrap!(gatt_server::register(sd));
+
+    #[rustfmt::skip]
+    let adv_data = &[
+        0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
+        0x03, 0x03, 0x09, 0x18,
+        0x0e, 0x09, b'A', b'i', b'r', b'F', b'o', b'r', b'c', b'e', b'O', b'n', b'e', b'V', b'1'
+    ];
+    #[rustfmt::skip]
+    let scan_data = &[
+        0x03, 0x03, 0x09, 0x18,
+    ];
+
+    loop {
+        let config = peripheral::Config::default();
+        let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
+            adv_data,
+            scan_data,
+        };
+        let conn = defmt::unwrap!(peripheral::advertise_connectable(sd, adv, &config).await);
+
+        defmt::info!("advertising done!");
+
+        // Run the GATT server on the connection. This returns when the connection gets disconnected.
+        let res = gatt_server::run(&conn, &server, |e| match e {
+            ServerEvent::Bas(e) => match e {
+                BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
+                    defmt::info!("battery notifications: {}", notifications)
+                }
+            },
+            ServerEvent::Foo(e) => match e {
+                FooServiceEvent::FooWrite(val) => {
+                    defmt::info!("wrote foo: {}", val);
+                    if let Err(e) = server.foo.foo_notify(&conn, val + 1) {
+                        defmt::info!("send notification error: {:?}", e);
+                    }
+                }
+                FooServiceEvent::FooCccdWrite {
+                    indications,
+                    notifications,
+                } => {
+                    defmt::info!(
+                        "foo indications: {}, notifications: {}",
+                        indications,
+                        notifications
+                    )
+                }
+            },
+        })
+        .await;
+
+        if let Err(e) = res {
+            defmt::info!("gatt_server run exited with error: {:?}", e);
+        }
+    }
+}
+
+pub fn embassy_config() -> embassy_nrf::config::Config {
+    let mut config = embassy_nrf::config::Config::default();
+    config.hfclk_source = embassy_nrf::config::HfclkSource::Internal;
+    config.lfclk_source = embassy_nrf::config::LfclkSource::InternalRC;
+    config.time_interrupt_priority = interrupt::Priority::P2;
+    // if we see button misses lower this
+    config.gpiote_interrupt_priority = interrupt::Priority::P7;
+    config
+}
+
+#[embassy::main(config = "embassy_config()")]
 async fn main(spawner: Spawner, p: Peripherals) {
     defmt::info!("Hello World!");
+
+    let config = nrf_softdevice::Config {
+        clock: Some(raw::nrf_clock_lf_cfg_t {
+            source: raw::NRF_CLOCK_LF_SRC_RC as u8,
+            rc_ctiv: 4,
+            rc_temp_ctiv: 2,
+            accuracy: 7,
+        }),
+        conn_gap: Some(raw::ble_gap_conn_cfg_t {
+            conn_count: 6,
+            event_length: 24,
+        }),
+        conn_gatt: Some(raw::ble_gatt_conn_cfg_t { att_mtu: 256 }),
+        gatts_attr_tab_size: Some(raw::ble_gatts_cfg_attr_tab_size_t {
+            attr_tab_size: 32768,
+        }),
+        gap_role_count: Some(raw::ble_gap_cfg_role_count_t {
+            adv_set_count: 1,
+            periph_role_count: 3,
+            central_role_count: 3,
+            central_sec_count: 0,
+            _bitfield_1: raw::ble_gap_cfg_role_count_t::new_bitfield_1(0),
+        }),
+        gap_device_name: Some(raw::ble_gap_cfg_device_name_t {
+            p_value: b"AirForceOneV1" as *const u8 as _,
+            current_len: 13,
+            max_len: 13,
+            write_perm: unsafe { core::mem::zeroed() },
+            _bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(
+                raw::BLE_GATTS_VLOC_STACK as u8,
+            ),
+        }),
+        ..Default::default()
+    };
+
+    let sd = Softdevice::enable(&config);
 
     let mut led = Output::new(p.P1_10, Level::Low, OutputDrive::Standard);
     let buzz = Output::new(p.P0_14, Level::Low, OutputDrive::Standard);
@@ -162,12 +290,14 @@ async fn main(spawner: Spawner, p: Peripherals) {
     defmt::unwrap!(spawner.spawn(tasks::usb::communication(usb, state)));
     defmt::unwrap!(spawner.spawn(tasks::buttons::task(esc, prev, next, ok, sender)));
     defmt::unwrap!(spawner.spawn(tasks::reporting::task(state, buzz)));
+    defmt::unwrap!(spawner.spawn(softdevice_task(sd)));
+    defmt::unwrap!(spawner.spawn(bluetooth_task(sd)));
 
     loop {
-        if defmt::unwrap!(led.is_set_high()) {
-            defmt::unwrap!(led.set_low());
+        if led.is_set_high() {
+            led.set_low();
         } else {
-            defmt::unwrap!(led.set_high());
+            led.set_high();
         }
 
         Timer::after(Duration::from_millis(500)).await;

@@ -75,10 +75,11 @@ const LP_TAU_FAST: Fix = Fix::from_bits(0x0014_0000); // 20
 const LP_TAU_SLOW: Fix = Fix::from_bits(0x01F4_0000); // 500
                                                       //const LP_ALPHA: Fix = Fix::from_bits(0xFFFF_CCCD); // -0.2
 const PERSISTENCE_UPTIME_GAMMA: Fix = Fix::from_bits(0x2A30_0000); // 500 // 3 * 3600
-const MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING: Fix = Fix::from_bits(0x0040_0000);
-const MEAN_VARIANCE_ESTIMATOR__FIX16_MAX: Fix = Fix::from_bits(0x7FFF_0000);
+const MEAN_VARIANCE_ESTIMATOR_GAMMA_SCALING: Fix = Fix::from_bits(0x0040_0000);
+const MEAN_VARIANCE_ESTIMATOR_FIX16_MAX: Fix = Fix::from_bits(0x7FFF_0000);
 
 // Stores VOC algorithm states
+#[allow(dead_code)]
 pub struct VocAlgorithm {
     voc_index_offset: Fix,
     tau_mean_variance_hours: Fix,
@@ -93,8 +94,8 @@ pub struct VocAlgorithm {
     adaptive_lowpass: AdaptiveLowpass,
 }
 
-impl VocAlgorithm {
-    pub fn new() -> Self {
+impl Default for VocAlgorithm {
+    fn default() -> Self {
         let (mean_variance_estimator, mox_model, sigmoid_scaled, adaptive_lowpass) =
             VocAlgorithm::new_instances(
                 SRAW_STD_INITIAL,
@@ -103,7 +104,7 @@ impl VocAlgorithm {
                 VOC_INDEX_OFFSET_DEFAULT,
             );
 
-        VocAlgorithm {
+        Self {
             voc_index_offset: VOC_INDEX_OFFSET_DEFAULT,
             tau_mean_variance_hours: TAU_MEAN_VARIANCE_HOURS,
             gating_max_duration_minutes: GATING_MAX_DURATION_MINUTES,
@@ -117,7 +118,9 @@ impl VocAlgorithm {
             adaptive_lowpass,
         }
     }
+}
 
+impl VocAlgorithm {
     fn new_instances(
         sraw_std_initial: Fix,
         tau_mean_variance_hours: Fix,
@@ -287,12 +290,12 @@ impl MeanVarianceEstimator {
         self.mean = ZERO;
         self.sraw_offset = ZERO;
         self.std = std_initial;
-        self.gamma = (MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING
+        self.gamma = (MEAN_VARIANCE_ESTIMATOR_GAMMA_SCALING
             * (SAMPLING_INTERVAL / alg_fixed!(3600)))
             / (tau_mean_variance_hours + SAMPLING_INTERVAL / alg_fixed!(3600));
-        self.gamma_initial_mean = (MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING * SAMPLING_INTERVAL)
+        self.gamma_initial_mean = (MEAN_VARIANCE_ESTIMATOR_GAMMA_SCALING * SAMPLING_INTERVAL)
             / (TAU_INITIAL_MEAN + SAMPLING_INTERVAL);
-        self.gamma_initial_variance = (MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING * SAMPLING_INTERVAL)
+        self.gamma_initial_variance = (MEAN_VARIANCE_ESTIMATOR_GAMMA_SCALING * SAMPLING_INTERVAL)
             / (TAU_INITIAL_VARIANCE + SAMPLING_INTERVAL);
         self.gamma_mean = ZERO;
         self.gamma_variance = ZERO;
@@ -318,7 +321,7 @@ impl MeanVarianceEstimator {
 
     fn calculate_gamma(&mut self, voc_index_from_prior: Fix) {
         // Check this as we are likely running in 32-bit environment
-        let uptime_limit = MEAN_VARIANCE_ESTIMATOR__FIX16_MAX - SAMPLING_INTERVAL;
+        let uptime_limit = MEAN_VARIANCE_ESTIMATOR_FIX16_MAX - SAMPLING_INTERVAL;
 
         //println!("Updatime gamma:{}", self.uptime_gamma);
 
@@ -408,7 +411,7 @@ impl MeanVarianceEstimator {
 
             //println!("Gamma variance:{}", self.gamma_variance);
 
-            let delta_sgp = (sraw - self.mean) / MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING;
+            let delta_sgp = (sraw - self.mean) / MEAN_VARIANCE_ESTIMATOR_GAMMA_SCALING;
 
             let c = self.std + delta_sgp.abs();
 
@@ -419,10 +422,10 @@ impl MeanVarianceEstimator {
             };
 
             self.std = (additional_scaling
-                * (MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING - self.gamma_variance))
+                * (MEAN_VARIANCE_ESTIMATOR_GAMMA_SCALING - self.gamma_variance))
                 .sqrt()
                 * ((self.std
-                    * (self.std / (MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING * additional_scaling)))
+                    * (self.std / (MEAN_VARIANCE_ESTIMATOR_GAMMA_SCALING * additional_scaling)))
                     + (((self.gamma_variance * delta_sgp) / additional_scaling) * delta_sgp))
                     .sqrt();
 
@@ -432,6 +435,7 @@ impl MeanVarianceEstimator {
     }
 }
 
+#[allow(non_snake_case)]
 struct MeanVarianceEstimatorSigmoid {
     L: Fix,
     K: Fix,
@@ -460,12 +464,11 @@ impl MeanVarianceEstimatorSigmoid {
         } else if x > alg_fixed!(50) {
             ZERO
         } else {
-            let result = self.L / (alg_fixed!(1) + fixed_exp(x));
-            //println!("Sigmoid:{}", result);
-            result
+            self.L / (alg_fixed!(1) + fixed_exp(x))
         }
     }
 
+    #[allow(non_snake_case)]
     fn set_parameters(&mut self, L: Fix, K: Fix, X0: Fix) {
         self.L = L;
         self.K = K;
@@ -491,7 +494,7 @@ fn fixed_exp(x: Fix) -> Fix {
     if x >= alg_fixed!(10.3972) {
         // The maximum value is often used in the context of adding one so it is the best
         // dealt here (won't have significant impact to the formulas)
-        MEAN_VARIANCE_ESTIMATOR__FIX16_MAX - alg_fixed!(1)
+        MEAN_VARIANCE_ESTIMATOR_FIX16_MAX - alg_fixed!(1)
     } else if x <= alg_fixed!(-11.7835) {
         ZERO
     } else {
@@ -529,8 +532,8 @@ impl SigmoidScaledInit {
     }
 
     fn process(&self, sample: Fix) -> Fix {
-        let SIGMOID_K = Fix::from_num(-0.0065);
-        let x = SIGMOID_K * (sample - SIGMOID_X0);
+        let sigmoid_k = Fix::from_num(-0.0065);
+        let x = sigmoid_k * (sample - SIGMOID_X0);
 
         if x < alg_fixed!(-50) {
             SIGMOID_L
@@ -568,6 +571,7 @@ impl MoxModel {
     }
 }
 
+#[allow(non_snake_case)]
 struct AdaptiveLowpass {
     A1: Fix,
     A2: Fix,
@@ -598,14 +602,14 @@ impl AdaptiveLowpass {
         }
 
         // TODO: Hopefully, the future version of Fixed crates help me to make this const
-        let LP_ALPHA = Fix::from_num(-0.2);
+        let lp_alpha = Fix::from_num(-0.2);
 
         self.X1 = (alg_fixed!(1) - self.A1) * self.X1 + self.A1 * sample;
         self.X2 = (alg_fixed!(1) - self.A2) * self.X2 + self.A2 * sample;
 
         let abs_delta = (self.X1 - self.X2).abs();
-        let F1 = fixed_exp(LP_ALPHA * abs_delta);
-        let tau_a = ((LP_TAU_SLOW - LP_TAU_FAST) * F1) + LP_TAU_FAST;
+        let f1 = fixed_exp(lp_alpha * abs_delta);
+        let tau_a = ((LP_TAU_SLOW - LP_TAU_FAST) * f1) + LP_TAU_FAST;
         let a3 = SAMPLING_INTERVAL / (SAMPLING_INTERVAL + tau_a);
         self.X3 = (alg_fixed!(1) - a3) * self.X3 + a3 * sample;
         self.X3

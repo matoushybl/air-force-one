@@ -4,7 +4,6 @@ use embassy::blocking_mutex::{CriticalSectionMutex, Mutex};
 use embassy::time::{Duration, Timer};
 use embassy_nrf::gpio::Output;
 use embassy_nrf::peripherals;
-use embedded_hal::digital::v2::OutputPin;
 use shared::AirQuality;
 
 #[embassy::task]
@@ -22,9 +21,9 @@ pub async fn task(
         }
 
         if count >= 10 {
-            // defmt::unwrap!(buzz.set_high());
+            // buzz.set_high();
             Timer::after(Duration::from_millis(200)).await;
-            defmt::unwrap!(buzz.set_low());
+            buzz.set_low();
             count = 0;
         }
     }

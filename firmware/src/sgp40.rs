@@ -5,6 +5,7 @@ use futures_intrusive::sync::LocalMutex;
 use crate::sps30::Error;
 use crate::vocalg::VocAlgorithm;
 
+#[allow(unused)]
 #[repr(u16)]
 enum Command {
     MeasureRaw = 0x260f,
@@ -34,7 +35,7 @@ where
     pub fn init(i2c: &'a LocalMutex<T>) -> Self {
         Self {
             bus: i2c,
-            voc: VocAlgorithm::new(),
+            voc: VocAlgorithm::default(),
         }
     }
 
@@ -88,7 +89,7 @@ where
 
     fn crc(data: &[u8]) -> u8 {
         let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
-        crc.update(&data);
+        crc.update(data);
         crc.finish()
     }
 

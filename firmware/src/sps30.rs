@@ -192,7 +192,7 @@ where
 
     fn crc(data: &[u8]) -> u8 {
         let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
-        crc.update(&data);
+        crc.update(data);
         crc.finish()
     }
 }

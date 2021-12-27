@@ -96,7 +96,7 @@ pub async fn render(
             )
             .unwrap(),
         }
-        Text::new(&mut buf, Point::zero())
+        Text::new(&buf, Point::zero())
             .into_styled(text_style)
             .draw(&mut disp)
             .unwrap();
