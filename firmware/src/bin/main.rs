@@ -11,6 +11,7 @@ use air_force_one::{self as _, scd30::SCD30, sps30::Sps30};
 use air_force_one::{tasks, ButtonEvent, Page, StaticSerialClassSet1, StaticUsb};
 
 use embassy::blocking_mutex::kind::Noop;
+use embassy::blocking_mutex::Mutex;
 use embassy::channel::mpsc::{self, Channel};
 use embassy::{
     blocking_mutex::CriticalSectionMutex,
@@ -32,11 +33,14 @@ use embassy_nrf::{
     usbd::UsbPeripheral,
     Peripherals,
 };
+use futures::future::select;
+use futures::pin_mut;
 use futures_intrusive::sync::LocalMutex;
 use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::{raw, Softdevice};
 use nrf_usbd::Usbd;
-use shared::AirQuality;
+use postcard::to_slice;
+use shared::{AirQuality, AirQualityAdvertisement};
 use usb_device::{
     class_prelude::UsbBusAllocator,
     device::{UsbDeviceBuilder, UsbVidPid},
@@ -89,61 +93,96 @@ struct Server {
     foo: FooService,
 }
 
+// todo: if not connected, update advertisements
+// advertise_connectable -> Connection
 #[embassy::task]
-async fn bluetooth_task(sd: &'static Softdevice) {
+async fn bluetooth_task(
+    sd: &'static Softdevice,
+    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
+) {
     let server: Server = defmt::unwrap!(gatt_server::register(sd));
 
-    #[rustfmt::skip]
-    let adv_data = &[
-        0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
-        0x03, 0x03, 0x09, 0x18,
-        0x0e, 0x09, b'A', b'i', b'r', b'F', b'o', b'r', b'c', b'e', b'O', b'n', b'e', b'V', b'1'
-    ];
     #[rustfmt::skip]
     let scan_data = &[
         0x03, 0x03, 0x09, 0x18,
     ];
 
     loop {
+        let mut adv_data = [0u8; 31];
+        let mut adv_offset = 0;
+
+        adv_offset += shared::fill_adv_data(
+            &mut adv_data,
+            0x01,
+            &[raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8],
+        );
+        adv_offset += shared::fill_adv_data(&mut adv_data[adv_offset..], 0x03, &[0x09, 0x18]);
+        adv_offset += shared::fill_adv_data(&mut adv_data[adv_offset..], 0x09, &[b'A', b'F', b'O']);
+
+        let mut buffer = [0u8; 31];
+        buffer[0] = 0xff;
+        buffer[1] = 0xff;
+        let data = state.lock(|cell| AirQualityAdvertisement::from(cell.get()));
+
+        defmt::error!("wtf: {:?}", data);
+
+        let serialized_len = to_slice(&data, &mut buffer[2..]).unwrap().len();
+
+        adv_offset += shared::fill_adv_data(
+            &mut adv_data[adv_offset..],
+            0xff,
+            &buffer[..2 + serialized_len],
+        );
         let config = peripheral::Config::default();
         let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
-            adv_data,
+            adv_data: &adv_data[..adv_offset],
             scan_data,
         };
-        let conn = defmt::unwrap!(peripheral::advertise_connectable(sd, adv, &config).await);
+        let adv_fut = peripheral::advertise_connectable(sd, adv, &config);
+        let timeout_fut = Timer::after(Duration::from_secs(5));
 
-        defmt::info!("advertising done!");
+        pin_mut!(adv_fut);
 
-        // Run the GATT server on the connection. This returns when the connection gets disconnected.
-        let res = gatt_server::run(&conn, &server, |e| match e {
-            ServerEvent::Bas(e) => match e {
-                BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
-                    defmt::info!("battery notifications: {}", notifications)
-                }
-            },
-            ServerEvent::Foo(e) => match e {
-                FooServiceEvent::FooWrite(val) => {
-                    defmt::info!("wrote foo: {}", val);
-                    if let Err(e) = server.foo.foo_notify(&conn, val + 1) {
-                        defmt::info!("send notification error: {:?}", e);
-                    }
-                }
-                FooServiceEvent::FooCccdWrite {
-                    indications,
-                    notifications,
-                } => {
-                    defmt::info!(
-                        "foo indications: {}, notifications: {}",
-                        indications,
-                        notifications
-                    )
-                }
-            },
-        })
-        .await;
+        let result = select(adv_fut, timeout_fut).await;
+        match result {
+            futures::future::Either::Left((conn, _)) => {
+                let conn = defmt::unwrap!(conn);
 
-        if let Err(e) = res {
-            defmt::info!("gatt_server run exited with error: {:?}", e);
+                defmt::info!("advertising done!");
+
+                // Run the GATT server on the connection. This returns when the connection gets disconnected.
+                let res = gatt_server::run(&conn, &server, |e| match e {
+                    ServerEvent::Bas(e) => match e {
+                        BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
+                            defmt::info!("battery notifications: {}", notifications)
+                        }
+                    },
+                    ServerEvent::Foo(e) => match e {
+                        FooServiceEvent::FooWrite(val) => {
+                            defmt::info!("wrote foo: {}", val);
+                            if let Err(e) = server.foo.foo_notify(&conn, val + 1) {
+                                defmt::info!("send notification error: {:?}", e);
+                            }
+                        }
+                        FooServiceEvent::FooCccdWrite {
+                            indications,
+                            notifications,
+                        } => {
+                            defmt::info!(
+                                "foo indications: {}, notifications: {}",
+                                indications,
+                                notifications
+                            )
+                        }
+                    },
+                })
+                .await;
+
+                if let Err(e) = res {
+                    defmt::info!("gatt_server run exited with error: {:?}", e);
+                }
+            }
+            futures::future::Either::Right(_) => defmt::error!("adv_conn timeout"),
         }
     }
 }
@@ -198,6 +237,8 @@ async fn main(spawner: Spawner, p: Peripherals) {
 
     let sd = Softdevice::enable(&config);
 
+    defmt::unwrap!(spawner.spawn(softdevice_task(sd)));
+
     let mut led = Output::new(p.P1_10, Level::Low, OutputDrive::Standard);
     let buzz = Output::new(p.P0_14, Level::Low, OutputDrive::Standard);
     let esc = InputChannel::new(
@@ -223,7 +264,7 @@ async fn main(spawner: Spawner, p: Peripherals) {
         embassy_nrf::gpiote::InputChannelPolarity::LoToHi,
     );
 
-    Timer::after(Duration::from_millis(500)).await;
+    Timer::after(Duration::from_millis(1000)).await;
     let config = twim::Config::default();
     let irq = interrupt::take!(SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0);
     let twi = Twim::new(p.TWISPI0, irq, p.P0_12, p.P0_11, config);
@@ -290,8 +331,7 @@ async fn main(spawner: Spawner, p: Peripherals) {
     defmt::unwrap!(spawner.spawn(tasks::usb::communication(usb, state)));
     defmt::unwrap!(spawner.spawn(tasks::buttons::task(esc, prev, next, ok, sender)));
     defmt::unwrap!(spawner.spawn(tasks::reporting::task(state, buzz)));
-    defmt::unwrap!(spawner.spawn(softdevice_task(sd)));
-    defmt::unwrap!(spawner.spawn(bluetooth_task(sd)));
+    defmt::unwrap!(spawner.spawn(bluetooth_task(sd, state)));
 
     loop {
         if led.is_set_high() {

@@ -74,7 +74,7 @@ pub async fn render(
     loop {
         disp.clear();
 
-        let mut buf = ArrayString::<[_; 64]>::new();
+        let mut buf = ArrayString::<[_; 128]>::new();
         let data = state.lock(|data| data.get());
         match page.lock(|data| data.get()) {
             Page::Basic => write!(
