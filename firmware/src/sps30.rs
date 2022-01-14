@@ -1,7 +1,9 @@
 use defmt::Format;
 use embassy_traits::i2c::{I2c, SevenBitAddress};
-use futures_intrusive::sync::LocalMutex;
 
+use crate::sensirion_i2c::{Error, SensirionCommand, SensirionI2c};
+
+#[repr(u16)]
 pub enum Sps30Command {
     StartMeasurement,
     StopMeasurement,
@@ -19,30 +21,31 @@ pub enum Sps30Command {
     Reset,
 }
 
-impl From<Sps30Command> for u16 {
-    fn from(raw: Sps30Command) -> Self {
-        match raw {
-            Sps30Command::StartMeasurement => 0x0010,
-            Sps30Command::StopMeasurement => 0x0104,
-            Sps30Command::ReadDataReadyFlag => 0x0202,
-            Sps30Command::ReadMeasuredValues => 0x0300,
-            Sps30Command::Sleep => 0x1001,
-            Sps30Command::WakeUp => 0x1103,
-            Sps30Command::StartFanCleaning => 0x5607,
-            Sps30Command::AutoCleaningInterval => 0x8004,
-            Sps30Command::ReadProductType => 0xd002,
-            Sps30Command::ReadSerialNumber => 0xd033,
-            Sps30Command::ReadVersion => 0xd100,
-            Sps30Command::ReadDeviceStatusRegister => 0xd206,
-            Sps30Command::ClearDeviceStatusRegister => 0xd210,
-            Sps30Command::Reset => 0xd304,
+impl SensirionCommand for Sps30Command {
+    fn raw(&self) -> u16 {
+        match self {
+            Self::StartMeasurement => 0x0010,
+            Self::StopMeasurement => 0x0104,
+            Self::ReadDataReadyFlag => 0x0202,
+            Self::ReadMeasuredValues => 0x0300,
+            Self::Sleep => 0x1001,
+            Self::WakeUp => 0x1103,
+            Self::StartFanCleaning => 0x5607,
+            Self::AutoCleaningInterval => 0x8004,
+            Self::ReadProductType => 0xd002,
+            Self::ReadSerialNumber => 0xd033,
+            Self::ReadVersion => 0xd100,
+            Self::ReadDeviceStatusRegister => 0xd206,
+            Self::ClearDeviceStatusRegister => 0xd210,
+            Self::Reset => 0xd304,
         }
     }
 }
 
+#[repr(u8)]
 pub enum MeasurementOutputFormat {
-    Float,
-    Integer,
+    Float = 0x03,
+    Integer = 0x05,
 }
 
 impl From<MeasurementOutputFormat> for u8 {
@@ -56,144 +59,77 @@ impl From<MeasurementOutputFormat> for u8 {
 
 const SENSOR_ADDR: u8 = 0x69;
 
-#[derive(defmt::Format)]
-pub enum Error<Inner: defmt::Format> {
-    Bus(Inner),
-    Crc,
+pub struct Sps30<'a, T>
+where
+    T: I2c<SevenBitAddress>,
+    T::Error: defmt::Format,
+{
+    bus: SensirionI2c<'a, T>,
 }
-
-impl<T: defmt::Format> From<T> for Error<T> {
-    fn from(inner: T) -> Self {
-        Self::Bus(inner)
-    }
-}
-
-pub struct Sps30<'a, T>(&'a LocalMutex<T>);
 
 impl<'a, T> Sps30<'a, T>
 where
     T: I2c<SevenBitAddress>,
     T::Error: defmt::Format,
 {
-    pub fn new(i2c: &'a LocalMutex<T>) -> Self {
-        Self(i2c)
+    pub fn new(bus: SensirionI2c<'a, T>) -> Self {
+        Self { bus }
     }
 
-    pub async fn read_version(&mut self) -> Result<[u8; 2], Error<T::Error>> {
-        let mut buffer = [0u8; 3];
-        self.read(Sps30Command::ReadVersion, &mut buffer, true)
-            .await?;
-        Ok(buffer[..2].try_into().unwrap())
+    pub async fn read_version(&mut self) -> Result<u16, Error<T::Error>> {
+        self.bus
+            .read_word(SENSOR_ADDR, Sps30Command::ReadVersion, true)
+            .await
     }
 
     pub async fn start_measurement(&mut self) -> Result<(), Error<T::Error>> {
-        self.write(
-            Sps30Command::StartMeasurement,
-            Some(&[MeasurementOutputFormat::Float.into(), 0x00]),
-        )
-        .await
+        self.bus
+            .write_word(
+                SENSOR_ADDR,
+                Sps30Command::StartMeasurement,
+                (MeasurementOutputFormat::Float as u16) << 8,
+            )
+            .await
     }
 
     pub async fn is_ready(&mut self) -> Result<bool, Error<T::Error>> {
-        let mut buffer = [0u8; 3];
-        self.read(Sps30Command::ReadDataReadyFlag, &mut buffer[..3], true)
+        let result = self
+            .bus
+            .read_word(SENSOR_ADDR, Sps30Command::ReadDataReadyFlag, true)
             .await?;
-        Ok(buffer[1] == 1)
+        Ok(result == 1)
     }
 
     pub async fn read_measured_data(&mut self) -> Result<AirInfo, Error<T::Error>> {
         let mut buffer: [u8; 60] = [0; 60];
-        self.read(Sps30Command::ReadMeasuredValues, &mut buffer, false)
+        self.bus
+            .read_raw(SENSOR_ADDR, Sps30Command::ReadMeasuredValues, &mut buffer)
             .await?;
 
-        fn process(buffer: &[u8]) -> f32 {
-            let raw = [buffer[0], buffer[1], buffer[3], buffer[4]];
-            let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
-            crc.update(&buffer[..2]);
-            let crc1 = crc.finish();
-
-            let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
-            crc.update(&buffer[3..5]);
-            let crc2 = crc.finish();
-
-            if crc1 != buffer[2] || crc2 != buffer[5] {
-                defmt::error!("crc invalid");
-            }
-            f32::from_be_bytes(raw)
-        }
-
-        defmt::info!("SPS30: raw data from sensor: {:x}", &buffer[..]);
         Ok(AirInfo {
-            mass_pm1_0: process(&buffer[..6]),
-            mass_pm2_5: process(&buffer[6..]),
-            mass_pm4_0: process(&buffer[12..]),
-            mass_pm10: process(&buffer[18..]),
-            number_pm0_5: process(&buffer[24..]),
-            number_pm1_0: process(&buffer[30..]),
-            number_pm2_5: process(&buffer[36..]),
-            number_pm4_0: process(&buffer[42..]),
-            number_pm10: process(&buffer[48..]),
-            typical_size: process(&buffer[54..]),
+            mass_pm1_0: self.process_data_slice(&buffer[..6]),
+            mass_pm2_5: self.process_data_slice(&buffer[6..]),
+            mass_pm4_0: self.process_data_slice(&buffer[12..]),
+            mass_pm10: self.process_data_slice(&buffer[18..]),
+            number_pm0_5: self.process_data_slice(&buffer[24..]),
+            number_pm1_0: self.process_data_slice(&buffer[30..]),
+            number_pm2_5: self.process_data_slice(&buffer[36..]),
+            number_pm4_0: self.process_data_slice(&buffer[42..]),
+            number_pm10: self.process_data_slice(&buffer[48..]),
+            typical_size: self.process_data_slice(&buffer[54..]),
         })
     }
 
-    async fn write(
-        &mut self,
-        command: Sps30Command,
-        payload: Option<&[u8]>,
-    ) -> Result<(), Error<T::Error>> {
-        let mut buffer = [0u8; 10];
+    fn process_data_slice(&mut self, buffer: &[u8]) -> f32 {
+        let raw = [buffer[0], buffer[1], buffer[3], buffer[4]];
+        let crc1 = self.bus.calculate_crc(&buffer[..2]);
 
-        let sensor_command: u16 = command.into();
-        let sensor_command = sensor_command.to_be_bytes();
+        let crc2 = self.bus.calculate_crc(&buffer[3..5]);
 
-        let mut offset = 0;
-        buffer[..2].copy_from_slice(&sensor_command);
-        offset += 2;
-
-        if let Some(payload) = payload {
-            buffer[offset..][..payload.len()].copy_from_slice(payload);
-            offset += payload.len();
-
-            buffer[offset] = Self::crc(&buffer[2..offset]);
-            offset += 1;
+        if crc1 != buffer[2] || crc2 != buffer[5] {
+            defmt::error!("crc invalid");
         }
-
-        self.0
-            .lock()
-            .await
-            .write(SENSOR_ADDR, &buffer[..offset])
-            .await?;
-
-        Ok(())
-    }
-
-    async fn read(
-        &mut self,
-        command: Sps30Command,
-        buffer: &mut [u8],
-        check_crc: bool,
-    ) -> Result<(), Error<T::Error>> {
-        let command: u16 = command.into();
-        let mut bus = self.0.lock().await;
-        bus.write(SENSOR_ADDR, &command.to_be_bytes()).await?;
-
-        bus.read(SENSOR_ADDR, buffer).await?;
-
-        if check_crc {
-            let crc = Self::crc(&buffer[..buffer.len() - 1]);
-            if crc != buffer[buffer.len() - 1] {
-                return Err(Error::Crc);
-            }
-        }
-
-        Ok(())
-    }
-
-    fn crc(data: &[u8]) -> u8 {
-        let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
-        crc.update(data);
-        crc.finish()
+        f32::from_be_bytes(raw)
     }
 }
 

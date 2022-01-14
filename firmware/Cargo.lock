@@ -27,7 +27,7 @@ version = "0.1.0"
 dependencies = [
  "alloc-cortex-m",
  "arrayvec",
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "cortex-m-rt",
  "crc_all",
  "defmt",
@@ -46,6 +46,7 @@ dependencies = [
  "nrf-softdevice-defmt-rtt",
  "nrf-softdevice-s140",
  "nrf-usbd",
+ "panic-persist",
  "panic-probe",
  "postcard",
  "shared",
@@ -64,11 +65,11 @@ dependencies = [
 
 [[package]]
 name = "alloc-cortex-m"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a67ad0fe14be887ed94e5722d14861c1877b128edbda2dd372e64d5243d614ae"
+checksum = "5069e21ec61f3b243a4a4c56d920d3206e6ee86022a67c23e9fe36eb60fc1efd"
 dependencies = [
- "cortex-m 0.6.7",
+ "cortex-m 0.7.4",
  "linked_list_allocator",
 ]
 
@@ -86,7 +87,7 @@ checksum = "45403b49e3954a4b8428a0ac21a4b7afadccf92bfd96273f1a58cd4812496ae0"
 dependencies = [
  "generic-array 0.12.4",
  "generic-array 0.13.3",
- "generic-array 0.14.4",
+ "generic-array 0.14.5",
  "stable_deref_trait",
 ]
 
@@ -178,15 +179,15 @@ dependencies = [
  "aligned",
  "bare-metal 0.2.5",
  "bitfield",
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "volatile-register",
 ]
 
 [[package]]
 name = "cortex-m"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ac919ef424449ec8c08d515590ce15d9262c0ca5f0da5b0c901e971a3b783b3"
+checksum = "37ff967e867ca14eba0c34ac25cd71ea98c678e741e3915d923999bb2fe7c826"
 dependencies = [
  "bare-metal 0.2.5",
  "bitfield",
@@ -228,7 +229,7 @@ checksum = "01e191a5a6f6edad9b679777ef6b6c0f2bdd4a333f2ecb8f61c3e28109a03d70"
 dependencies = [
  "bare-metal 1.0.0",
  "cfg-if",
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "riscv",
 ]
 
@@ -332,17 +333,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d1ce010e1a51aef925c98f12ed81a4e0e96ce0185a87c33f1b3b9c8f20749c7"
 
 [[package]]
-name = "derivative"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "display-interface"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -372,11 +362,11 @@ dependencies = [
 [[package]]
 name = "embassy"
 version = "0.1.0"
-source = "git+https://github.com/matoushybl/embassy.git?branch=feat/usb#e3e74b6d04bf29b67de716e693e764773b513a98"
+source = "git+https://github.com/matoushybl/embassy.git?branch=master#8f81a6548f748ccfd8d62276a91539faf4633e44"
 dependencies = [
  "atomic-polyfill",
  "cfg-if",
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "critical-section",
  "defmt",
  "embassy-macros",
@@ -390,9 +380,9 @@ dependencies = [
 [[package]]
 name = "embassy-hal-common"
 version = "0.1.0"
-source = "git+https://github.com/matoushybl/embassy.git?branch=feat/usb#e3e74b6d04bf29b67de716e693e764773b513a98"
+source = "git+https://github.com/matoushybl/embassy.git?branch=master#8f81a6548f748ccfd8d62276a91539faf4633e44"
 dependencies = [
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "embassy",
  "num-traits",
  "usb-device",
@@ -401,7 +391,7 @@ dependencies = [
 [[package]]
 name = "embassy-macros"
 version = "0.1.0"
-source = "git+https://github.com/matoushybl/embassy.git?branch=feat/usb#e3e74b6d04bf29b67de716e693e764773b513a98"
+source = "git+https://github.com/matoushybl/embassy.git?branch=master#8f81a6548f748ccfd8d62276a91539faf4633e44"
 dependencies = [
  "darling 0.13.1",
  "proc-macro2",
@@ -412,10 +402,10 @@ dependencies = [
 [[package]]
 name = "embassy-nrf"
 version = "0.1.0"
-source = "git+https://github.com/matoushybl/embassy.git?branch=feat/usb#e3e74b6d04bf29b67de716e693e764773b513a98"
+source = "git+https://github.com/matoushybl/embassy.git?branch=master#8f81a6548f748ccfd8d62276a91539faf4633e44"
 dependencies = [
  "cfg-if",
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "cortex-m-rt",
  "critical-section",
  "defmt",
@@ -430,15 +420,17 @@ dependencies = [
  "nrf-usbd",
  "nrf52840-pac",
  "rand_core",
+ "usb-device",
 ]
 
 [[package]]
 name = "embassy-traits"
 version = "0.1.0"
-source = "git+https://github.com/matoushybl/embassy.git?branch=feat/usb#e3e74b6d04bf29b67de716e693e764773b513a98"
+source = "git+https://github.com/matoushybl/embassy.git?branch=master#8f81a6548f748ccfd8d62276a91539faf4633e44"
 dependencies = [
  "defmt",
  "embedded-hal",
+ "nb 1.0.0",
 ]
 
 [[package]]
@@ -607,9 +599,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "0.14.4"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "501466ecc8a30d1d3b7fc9229b122b2ce8ed6e9d9223f1138d4babb253e51817"
+checksum = "fd48d33ec7f05fbfa152300fdad764757cbded343c1aa1cff2fbaf4134851803"
 dependencies = [
  "typenum",
  "version_check",
@@ -703,9 +695,9 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 [[package]]
 name = "nrf-softdevice"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ccfdc34c76d18230b5acfc0fcb107ea079f8700e"
+source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ad1f542aacc35f1c7d8d0ae046f9c3edabe420c1"
 dependencies = [
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "cortex-m-rt",
  "critical-section",
  "defmt",
@@ -722,7 +714,7 @@ dependencies = [
 [[package]]
 name = "nrf-softdevice-defmt-rtt"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ccfdc34c76d18230b5acfc0fcb107ea079f8700e"
+source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ad1f542aacc35f1c7d8d0ae046f9c3edabe420c1"
 dependencies = [
  "cortex-m 0.6.7",
  "critical-section",
@@ -733,7 +725,7 @@ dependencies = [
 [[package]]
 name = "nrf-softdevice-macro"
 version = "0.1.0"
-source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ccfdc34c76d18230b5acfc0fcb107ea079f8700e"
+source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ad1f542aacc35f1c7d8d0ae046f9c3edabe420c1"
 dependencies = [
  "Inflector",
  "darling 0.10.2",
@@ -746,15 +738,17 @@ dependencies = [
 [[package]]
 name = "nrf-softdevice-s140"
 version = "0.1.1"
-source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ccfdc34c76d18230b5acfc0fcb107ea079f8700e"
+source = "git+https://github.com/embassy-rs/nrf-softdevice.git#ad1f542aacc35f1c7d8d0ae046f9c3edabe420c1"
 
 [[package]]
 name = "nrf-usbd"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "945a178131ac5f69941dadb0d51c8e17cbe34cc09a0e2d51c099160a463751b8"
+checksum = "640e88d4c108743c667f03320d0c9ab24a20f183a7a1b18bde7891ee13fd92c5"
 dependencies = [
- "cortex-m 0.7.3",
+ "bare-metal 1.0.0",
+ "cortex-m 0.7.4",
+ "critical-section",
  "usb-device",
  "vcell",
 ]
@@ -765,7 +759,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "209c71d29ce1c0e9249b59ffff1ff5035c68b65070bf4c1315767fa4c93103ac"
 dependencies = [
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "cortex-m-rt",
  "vcell",
 ]
@@ -781,23 +775,31 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "085fe377a4b2805c0fbc09484415ec261174614b7f080b0e0d520456ac421a67"
+checksum = "720d3ea1055e4e4574c0c0b0f8c3fd4f24c4cdaf465948206dea090b57b526ad"
 dependencies = [
- "derivative",
  "num_enum_derive",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5249369707a1e07b39f78d98c8f34e00aca7dcb053812fdbb5ad7be82c1bba38"
+checksum = "0d992b768490d7fe0d8586d9b5745f6c49f557da6d81dc982b1d167ad4edbb21"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "panic-persist"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32bb382689ecd2c4d2d4df9fd56700ba8d43b7b31cca11018cc0e6f8aef39fd5"
+dependencies = [
+ "cortex-m 0.7.4",
 ]
 
 [[package]]
@@ -806,24 +808,24 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ab1f00eac22bd18f8e5cae9555f2820b3a0c166b5b556ee3e203746ea6dcf3a"
 dependencies = [
- "cortex-m 0.7.3",
+ "cortex-m 0.7.4",
  "defmt",
 ]
 
 [[package]]
 name = "pin-project"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1622113ce508488160cff04e6abc60960e676d330e1ca0f77c0b8df17c81438f"
+checksum = "58ad3879ad3baf4e44784bc6a718a8698867bb991f8ce24d1bcbe2cfb4c3a75e"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b95af56fee93df76d721d356ac1ca41fccf168bc448eb14049234df764ba3e76"
+checksum = "744b6f092ba29c3650faf274db506afd39944f48420f6c86b17cfe0ee1cb36bb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -832,9 +834,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d31d11c69a6b52a174b42bdc0c30e5e11670f90788b2c471c31c1d17d449443"
+checksum = "e280fbe77cc62c91527259e9442153f4688736748d24660126286329742b4c6c"
 
 [[package]]
 name = "pin-utils"
@@ -844,9 +846,9 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "postcard"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8863e251332eb18520388099b8b0acc4810ed6e602e3b6f674e8a46ba20e15c"
+checksum = "a25c0b0ae06fcffe600ad392aabfa535696c8973f2253d9ac83171924c58a858"
 dependencies = [
  "heapless",
  "postcard-cobs",
@@ -885,18 +887,18 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.35"
+version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "392a54546fda6b7cc663379d0e6ce8b324cf88aecc5a499838e1be9781bdce2e"
+checksum = "c7342d5883fbccae1cc37a2353b09c87c9b0f3afd73f5fb9bba687a1f733b029"
 dependencies = [
  "unicode-xid",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.10"
+version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38bc8cc6a5f2e3655e0899c1b848643b2562f853f114bfec7be120678e3ace05"
+checksum = "47aa80447ce4daf1717500037052af176af5d38cc3e571d9ec1c7353fc10c87d"
 dependencies = [
  "proc-macro2",
 ]
@@ -977,18 +979,18 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b9875c23cf305cd1fd7eb77234cbb705f21ea6a72c637a5c6db5fe4b8e7f008"
+checksum = "97565067517b60e2d1ea8b268e59ce036de907ac523ad83a0475da04e818989a"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc0db5cb2556c0e558887d9bbdcf6ac4471e83ff66cf696e5419024d1606276"
+checksum = "ed201699328568d8d08208fdd080e3ff594e6c422e438b6705905da01005d537"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1024,7 +1026,7 @@ dependencies = [
  "display-interface-spi",
  "embedded-graphics",
  "embedded-hal",
- "generic-array 0.14.4",
+ "generic-array 0.14.5",
 ]
 
 [[package]]
@@ -1047,9 +1049,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "1.0.84"
+version = "1.0.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecb2e6da8ee5eb9a61068762a32fa9619cc591ceb055b3687f4cd4051ec2e06b"
+checksum = "a684ac3dcd8913827e18cd09a68384ee66c1de24157e3c556c9ab16d85695fb7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1088,9 +1090,9 @@ checksum = "77439c1b53d2303b20d9459b1ade71a83c716e3f9c34f3228c00e6f185d6c002"
 
 [[package]]
 name = "version_check"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
+checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "void"
@@ -1106,8 +1108,3 @@ checksum = "9ee8f19f9d74293faf70901bc20ad067dc1ad390d2cbf1e3f75f721ffee908b6"
 dependencies = [
  "vcell",
 ]
-
-[[patch.unused]]
-name = "embassy-net"
-version = "0.1.0"
-source = "git+https://github.com/matoushybl/embassy.git?branch=feat/usb#e3e74b6d04bf29b67de716e693e764773b513a98"

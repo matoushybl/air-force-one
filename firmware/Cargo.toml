@@ -4,15 +4,17 @@ authors = ["Matous Hybl <hyblmatous@gmail.com>"]
 name = "air-force-one"
 edition = "2021"
 version = "0.1.0"
-resolver = "2"
+
+[features]
+default = ["persist-panic"]
+persist-panic = []
 
 [patch.crates-io]
-embassy = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb"}
-embassy-nrf = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
-embassy-net = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
-embassy-hal-common = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
-embassy-traits = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
-embassy-macros = { git = "https://github.com/matoushybl/embassy.git", branch = "feat/usb" }
+embassy = { git = "https://github.com/matoushybl/embassy.git", branch = "master"}
+embassy-nrf = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
+embassy-hal-common = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
+embassy-traits = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
+embassy-macros = { git = "https://github.com/matoushybl/embassy.git", branch = "master" }
 nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice.git" }
 nrf-softdevice-s140 = { git = "https://github.com/embassy-rs/nrf-softdevice.git" }
 nrf-softdevice-defmt-rtt = { git = "https://github.com/embassy-rs/nrf-softdevice.git" }
@@ -35,6 +37,7 @@ cortex-m = "0.7.3"
 cortex-m-rt = "0.7.0"
 embedded-hal = "0.2.6"
 panic-probe = { version = "0.3.0", features = ["print-defmt"] }
+panic-persist = { version = "0.3.0", features = ["utf8", "custom-panic-handler"] }
 ssd1306 = "0.5.1"
 embedded-graphics = "0.6.2"
 arrayvec = { version = "0.5.2", default-features = false }

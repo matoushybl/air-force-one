@@ -27,9 +27,10 @@ pub async fn voc_task(
         if humidity > 1.0 {
             if let Ok(voc) = sensor.measure_voc_index(humidity, temperature).await {
                 state.lock(|state| {
-                    let mut s = state.get();
-                    s.voc_index = voc;
-                    state.set(s);
+                    state.update(|mut state| {
+                        state.voc_index = voc;
+                        state
+                    });
                 });
                 defmt::info!("voc: {}", voc);
             } else {
@@ -46,22 +47,27 @@ pub async fn co2_task(
     state: &'static CriticalSectionMutex<Cell<AirQuality>>,
 ) {
     defmt::info!(
-        "SCD30: {}",
+        "Scd30: {}",
         defmt::unwrap!(sensor.get_temperature_offset().await)
     );
     defmt::unwrap!(sensor.set_temperature_offset(3.8).await);
     loop {
-        if sensor.get_data_ready().await.unwrap() {
-            let measurement = sensor.read_measurement().await.unwrap();
-            state.lock(|data| {
-                let mut raw = data.get();
-                raw.co2_concentration = measurement.co2;
-                raw.temperature = measurement.temperature;
-                raw.humidity = measurement.humidity;
-                data.set(raw)
-            });
-            defmt::info!("SCD30: co2 {}", measurement.co2);
+        if let Ok(true) = sensor.get_data_ready().await {
+            if let Ok(measurement) = sensor.read_measurement().await {
+                state.lock(|data| {
+                    data.update(|mut state| {
+                        state.co2_concentration = measurement.co2;
+                        state.temperature = measurement.temperature;
+                        state.humidity = measurement.humidity;
+                        state
+                    });
+                });
+                defmt::info!("Scd30: co2 {}", measurement.co2);
+            } else {
+                defmt::error!("Scd30: measurement error.")
+            }
         }
+        Timer::after(Duration::from_millis(100)).await;
     }
 }
 
@@ -84,18 +90,19 @@ pub async fn pm_task(
         if defmt::unwrap!(sensor.is_ready().await) {
             let measured = defmt::unwrap!(sensor.read_measured_data().await);
             state.lock(|data| {
-                let mut raw = data.get();
-                raw.mass_pm1_0 = measured.mass_pm1_0;
-                raw.mass_pm2_5 = measured.mass_pm2_5;
-                raw.mass_pm4_0 = measured.mass_pm4_0;
-                raw.mass_pm10 = measured.mass_pm10;
-                raw.number_pm0_5 = measured.number_pm0_5;
-                raw.number_pm1_0 = measured.number_pm1_0;
-                raw.number_pm2_5 = measured.number_pm2_5;
-                raw.number_pm4_0 = measured.number_pm4_0;
-                raw.number_pm10 = measured.number_pm10;
-                raw.typical_particulate_matter_size = measured.typical_size;
-                data.set(raw)
+                data.update(|mut state| {
+                    state.mass_pm1_0 = measured.mass_pm1_0;
+                    state.mass_pm2_5 = measured.mass_pm2_5;
+                    state.mass_pm4_0 = measured.mass_pm4_0;
+                    state.mass_pm10 = measured.mass_pm10;
+                    state.number_pm0_5 = measured.number_pm0_5;
+                    state.number_pm1_0 = measured.number_pm1_0;
+                    state.number_pm2_5 = measured.number_pm2_5;
+                    state.number_pm4_0 = measured.number_pm4_0;
+                    state.number_pm10 = measured.number_pm10;
+                    state.typical_particulate_matter_size = measured.typical_size;
+                    state
+                });
             });
             defmt::info!("SPS30: data: {}", measured);
         }

@@ -1,12 +1,12 @@
-use embassy::time::{Duration, Timer};
+use embassy::time::Duration;
 use embassy_traits::i2c::{I2c, SevenBitAddress};
-use futures_intrusive::sync::LocalMutex;
 
-use crate::sps30::Error;
+use crate::sensirion_i2c::{Error, SensirionCommand, SensirionI2c};
 use crate::vocalg::VocAlgorithm;
 
 #[allow(unused)]
 #[repr(u16)]
+#[derive(Clone, Copy)]
 enum Command {
     MeasureRaw = 0x260f,
     ExecuteSelfTest = 0x280e,
@@ -14,16 +14,20 @@ enum Command {
     GetSerialNumber = 0x3682,
 }
 
-impl From<Command> for u16 {
-    fn from(raw: Command) -> Self {
-        raw as u16
+impl SensirionCommand for Command {
+    fn raw(&self) -> u16 {
+        *self as u16
     }
 }
 
 const ADDRESS: u8 = 0x59;
 
-pub struct Sgp40<'a, T> {
-    bus: &'a LocalMutex<T>,
+pub struct Sgp40<'a, T>
+where
+    T: I2c<SevenBitAddress>,
+    T::Error: defmt::Format,
+{
+    bus: SensirionI2c<'a, T>,
     voc: VocAlgorithm,
 }
 
@@ -32,7 +36,7 @@ where
     T: I2c<SevenBitAddress>,
     T::Error: defmt::Format,
 {
-    pub fn init(i2c: &'a LocalMutex<T>) -> Self {
+    pub fn init(i2c: SensirionI2c<'a, T>) -> Self {
         Self {
             bus: i2c,
             voc: VocAlgorithm::default(),
@@ -41,7 +45,8 @@ where
 
     pub async fn get_serial_number(&mut self) -> Result<u64, Error<T::Error>> {
         let mut buffer = [0u8; 9];
-        self.read(Command::GetSerialNumber, &mut buffer, false)
+        self.bus
+            .read_raw(ADDRESS, Command::GetSerialNumber, &mut buffer)
             .await?;
         Ok(u64::from(buffer[0]) << 40
             | u64::from(buffer[1]) << 32
@@ -56,7 +61,7 @@ where
         humidity: f32,
         temperature: f32,
     ) -> Result<u16, Error<T::Error>> {
-        let command: u16 = Command::MeasureRaw.into();
+        let command = Command::MeasureRaw.raw();
         let raw_command = command.to_be_bytes();
         let raw_humidity = (((humidity / 100.0) * 65535.0) as u16).to_be_bytes();
         let raw_temp = ((((temperature + 45.0) / 175.0) * 65535.0) as u16).to_be_bytes();
@@ -65,17 +70,21 @@ where
             raw_command[1],
             raw_humidity[0],
             raw_humidity[1],
-            Self::crc(&raw_humidity),
+            self.bus.calculate_crc(&raw_humidity),
             raw_temp[0],
             raw_temp[1],
-            Self::crc(&raw_temp),
+            self.bus.calculate_crc(&raw_temp),
         ];
-        let mut bus = self.bus.lock().await;
-        bus.write(ADDRESS, &write_data).await?;
-        Timer::after(Duration::from_millis(30)).await;
         let mut result = [0u8; 3];
-        bus.read(ADDRESS, &mut result).await?;
-        Ok(u16::from_be_bytes((&result[0..2]).try_into().unwrap()))
+        self.bus
+            .write_read_raw(
+                ADDRESS,
+                &write_data,
+                &mut result,
+                Some(Duration::from_millis(30)),
+            )
+            .await?;
+        Ok(u16::from_be_bytes((&result[..2]).try_into().unwrap()))
     }
 
     pub async fn measure_voc_index(
@@ -85,33 +94,5 @@ where
     ) -> Result<u16, Error<T::Error>> {
         let raw = self.measure_raw(humidity, temperature).await?;
         Ok(self.voc.process(raw as i32) as u16)
-    }
-
-    fn crc(data: &[u8]) -> u8 {
-        let mut crc = crc_all::Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
-        crc.update(data);
-        crc.finish()
-    }
-
-    async fn read(
-        &mut self,
-        command: Command,
-        buffer: &mut [u8],
-        check_crc: bool,
-    ) -> Result<(), Error<T::Error>> {
-        let command: u16 = command.into();
-        let mut bus = self.bus.lock().await;
-        bus.write(ADDRESS, &command.to_be_bytes()).await?;
-
-        bus.read(ADDRESS, buffer).await?;
-
-        if check_crc {
-            let crc = Self::crc(&buffer[..buffer.len() - 1]);
-            if crc != buffer[buffer.len() - 1] {
-                return Err(Error::Crc);
-            }
-        }
-
-        Ok(())
     }
 }

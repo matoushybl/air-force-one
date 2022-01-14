@@ -65,7 +65,10 @@ pub async fn render(
         .connect(interface)
         .into();
 
-    disp.init().unwrap();
+    if disp.init().is_err() {
+        defmt::error!("Display initialization failed.");
+        return;
+    }
 
     let text_style = TextStyleBuilder::new(Font6x8)
         .text_color(BinaryColor::On)

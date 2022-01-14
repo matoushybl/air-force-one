@@ -15,6 +15,7 @@
         "firmware/Cargo.toml",
         // "telegraf-bridge/Cargo.toml",
         // "shared/Cargo.toml",
+        // "ble-receiver-desktop/Cargo.toml",
     ],
     "rust-analyzer.procMacro.enable": true,
     "rust-analyzer.cargo.runBuildScripts": true,
