@@ -1,3 +1,4 @@
+pub mod bluetooth;
 pub mod buttons;
 pub mod display;
 pub mod reporting;

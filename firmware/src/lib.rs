@@ -8,6 +8,7 @@ pub mod tasks;
 
 pub mod scd30;
 
+pub mod board;
 pub mod sensirion_i2c;
 pub mod sgp40;
 pub mod sps30;
@@ -21,6 +22,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc_cortex_m::CortexMHeap;
 use embassy_hal_common::usb::usb_serial::UsbSerial;
 use embassy_hal_common::usb::ClassSet1;
+use embassy_nrf::interrupt;
 use embassy_nrf::peripherals::USBD;
 use embassy_nrf::usb::UsbBus;
 use nrf_softdevice::raw;
@@ -60,6 +62,8 @@ fn alloc_error(_layout: Layout) -> ! {
 
 pub type StaticUsb = Usbd<UsbBus<'static, USBD>>;
 pub type StaticSerialClassSet1 = ClassSet1<StaticUsb, UsbSerial<'static, 'static, StaticUsb>>;
+pub type Usb =
+    embassy_hal_common::usb::Usb<'static, StaticUsb, StaticSerialClassSet1, interrupt::USBD>;
 
 pub enum ButtonEvent {
     Esc,
@@ -117,6 +121,16 @@ fn panic(info: &PanicInfo) -> ! {
     panic_persist::report_panic_info(info);
 
     cortex_m::asm::udf()
+}
+
+pub fn embassy_config() -> embassy_nrf::config::Config {
+    let mut config = embassy_nrf::config::Config::default();
+    config.hfclk_source = embassy_nrf::config::HfclkSource::Internal;
+    config.lfclk_source = embassy_nrf::config::LfclkSource::InternalRC;
+    config.time_interrupt_priority = interrupt::Priority::P2;
+    // if we see button misses lower this
+    config.gpiote_interrupt_priority = interrupt::Priority::P7;
+    config
 }
 
 /// Reinitializes reset pin in the hardware.

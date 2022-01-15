@@ -2,15 +2,12 @@ use core::cell::Cell;
 
 use embassy::blocking_mutex::{CriticalSectionMutex, Mutex};
 use embassy::time::{Duration, Timer};
-use embassy_nrf::interrupt;
 use futures::pin_mut;
 use shared::AirQuality;
 
-use crate::{StaticSerialClassSet1, StaticUsb};
-
 #[embassy::task]
 pub async fn communication(
-    usb: embassy_hal_common::usb::Usb<'static, StaticUsb, StaticSerialClassSet1, interrupt::USBD>,
+    usb: crate::Usb,
     state: &'static CriticalSectionMutex<Cell<AirQuality>>,
 ) {
     use embassy::io::AsyncWriteExt;
