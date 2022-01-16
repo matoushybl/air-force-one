@@ -12,8 +12,8 @@
     "rust-analyzer.cargo.features": [],
     "rust-analyzer.linkedProjects": [
         // Declare for the target you wish to develop
-        "firmware/Cargo.toml",
-        // "telegraf-bridge/Cargo.toml",
+        // "firmware/Cargo.toml",
+        "telegraf-bridge/Cargo.toml",
         // "shared/Cargo.toml",
         // "ble-receiver-desktop/Cargo.toml",
     ],

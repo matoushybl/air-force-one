@@ -10,3 +10,6 @@ telegraf = "*"
 serial2 = "0.1.6"
 postcard = "0.7.2"
 shared = { path = "../shared", features = ["std"] }
+tokio = { version = "1.10.0", features = ["full"] }
+tokio-serial = { version = "5.4", features = ["rt"]}
+clap = {version = "3.0", features = ["derive"]}

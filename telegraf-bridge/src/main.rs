@@ -1,6 +1,9 @@
-use serial2::SerialPort;
+use std::time::Duration;
+
 use shared::AirQuality;
 use telegraf::{Client, Metric};
+use tokio::io::AsyncReadExt;
+use tokio_serial::{SerialPortBuilderExt, SerialStream};
 
 #[derive(Metric)]
 struct CarbonDioxide {
@@ -35,75 +38,88 @@ struct AirQualityMetric {
     pub typical_particulate_matter_size: f32,
     pub voc_index: i32,
     #[telegraf(tag)]
-    tag1: String,
+    tag: String,
 }
 
-fn main() {
-    println!("Hello, world!");
+impl From<AirQuality> for AirQualityMetric {
+    fn from(raw: AirQuality) -> Self {
+        Self {
+            tag: "default".to_string(),
+            co2: raw.co2_concentration,
+            temperature: raw.temperature,
+            humidity: raw.humidity,
+            mass_pm1_0: raw.mass_pm1_0,
+            mass_pm2_5: raw.mass_pm2_5,
+            mass_pm4_0: raw.mass_pm4_0,
+            mass_pm10: raw.mass_pm10,
+            number_pm0_5: raw.number_pm0_5,
+            number_pm1_0: raw.number_pm1_0,
+            number_pm2_5: raw.number_pm2_5,
+            number_pm4_0: raw.number_pm4_0,
+            number_pm10: raw.number_pm10,
+            typical_particulate_matter_size: raw.typical_particulate_matter_size,
+            voc_index: raw.voc_index as i32,
+        }
+    }
+}
 
-    let mut client = Client::new("tcp://localhost:8094").unwrap();
-    let point = CarbonDioxide {
-        field1: 1800.234,
-        tag1: "afo1".to_string(),
-    };
-    client.write(&point).unwrap();
-    let port = SerialPort::open("/dev/cu.usbmodemAFO1", 115200).unwrap();
+use clap::Parser;
+
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Config {
+    port: String,
+    tag: String,
+    telegraf_address: Option<String>,
+}
+
+#[tokio::main]
+async fn main() {
+    println!("Hello, world!");
+    let config = Config::parse();
+
+    let mut client = Client::new(&format!(
+        "tcp://{}",
+        config
+            .telegraf_address
+            .unwrap_or("localhost:8094".to_string()),
+    ))
+    .unwrap();
+
+    loop {
+        match tokio_serial::new(config.port.as_str(), 115200).open_native_async() {
+            Ok(port) => handle_serial_port(port, &mut client, config.tag.as_str()).await,
+            Err(_) => println!("Failed to open serial port."),
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+async fn handle_serial_port(mut port: SerialStream, client: &mut Client, tag: &str) {
+    // TODO rewrite using tokio codec
     let mut buffer = [0; 256];
     let mut rolling_buffer = Vec::<u8>::new();
     loop {
-        if let Ok(read) = port.read(&mut buffer) {
-            println!("read {:?}", read);
+        let read_result =
+            tokio::time::timeout(Duration::from_secs(10), port.read(&mut buffer)).await;
+        if let Ok(Ok(read)) = read_result {
+            if read == 0 {
+                return;
+            }
             rolling_buffer.extend_from_slice(&buffer[..read]);
             if rolling_buffer.contains(&0) {
                 if let Ok(decoded) =
                     postcard::from_bytes_cobs::<AirQuality>(&mut rolling_buffer[..])
                 {
                     println!("{:?}", decoded);
-                    let point = AirQualityMetric {
-                        tag1: "afo1".to_string(),
-                        co2: decoded.co2_concentration,
-                        temperature: decoded.temperature,
-                        humidity: decoded.humidity,
-                        mass_pm1_0: decoded.mass_pm1_0,
-                        mass_pm2_5: decoded.mass_pm2_5,
-                        mass_pm4_0: decoded.mass_pm4_0,
-                        mass_pm10: decoded.mass_pm10,
-                        number_pm0_5: decoded.number_pm0_5,
-                        number_pm1_0: decoded.number_pm1_0,
-                        number_pm2_5: decoded.number_pm2_5,
-                        number_pm4_0: decoded.number_pm4_0,
-                        number_pm10: decoded.number_pm10,
-                        typical_particulate_matter_size: decoded.typical_particulate_matter_size,
-                        voc_index: decoded.voc_index as i32,
-                    };
+                    let mut point = AirQualityMetric::from(decoded);
+                    point.tag = tag.to_string();
                     client.write(&point).unwrap();
                 }
                 rolling_buffer.clear();
             }
+        } else {
+            return;
         }
     }
 }
-
-// struct Reader<R: std::io::Read> {
-//     buffer: Vec<u8>,
-//     end: usize,
-// }
-
-// impl<R: std::io::Read> Reader<R> {
-//     pub fn new(buffer_size: usize) -> Self {
-//         Self {
-//             buffer: vec![0u8; buffer_size],
-//             end: 0,
-//         }
-//     }
-
-//     pub fn contains(&self, data: &u8) -> bool {
-//         self.buffer[..end].contains(data)
-//     }
-// }
-
-// impl<R: std::io::Read> std::io::Read for Reader<R> {
-//     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-//         todo!()
-//     }
-// }
