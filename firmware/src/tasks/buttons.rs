@@ -8,7 +8,7 @@ use embedded_hal::digital::v2::InputPin;
 use futures::future::{select, Either};
 use futures::pin_mut;
 
-use crate::ButtonEvent;
+use crate::app::ButtonEvent;
 
 macro_rules! naive_debounce {
     ($name:ident) => {

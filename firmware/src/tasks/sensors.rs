@@ -1,37 +1,25 @@
-use core::cell::Cell;
-
-use embassy::blocking_mutex::CriticalSectionMutex;
-use embassy::blocking_mutex::Mutex;
 use embassy::time::{Duration, Timer};
 use embassy_nrf::peripherals;
 use embassy_nrf::twim::Twim;
-use shared::AirQuality;
 
-use crate::scd30::SCD30;
-use crate::sgp40::Sgp40;
-use crate::sps30::Sps30;
+use crate::app::App;
+use crate::drivers::scd30::SCD30;
+use crate::drivers::sgp40::Sgp40;
+use crate::drivers::sps30::Sps30;
 
 #[embassy::task]
-pub async fn voc_task(
-    mut sensor: Sgp40<'static, Twim<'static, peripherals::TWISPI0>>,
-    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
-) {
+pub async fn voc_task(mut sensor: Sgp40<'static, Twim<'static, peripherals::TWISPI0>>, app: App) {
     defmt::error!(
         "voc version: {=u64:x}",
         defmt::unwrap!(sensor.get_serial_number().await)
     );
 
     loop {
-        let (temperature, humidity) =
-            state.lock(|state| (state.get().temperature, state.get().humidity));
+        let air_quality = app.air_quality();
+        let (temperature, humidity) = (air_quality.temperature, air_quality.humidity);
         if humidity > 1.0 {
             if let Ok(voc) = sensor.measure_voc_index(humidity, temperature).await {
-                state.lock(|state| {
-                    state.update(|mut state| {
-                        state.voc_index = voc;
-                        state
-                    });
-                });
+                app.update_voc(voc);
                 defmt::info!("voc: {}", voc);
             } else {
                 defmt::error!("Failed to read data from VOC.");
@@ -42,10 +30,7 @@ pub async fn voc_task(
 }
 
 #[embassy::task]
-pub async fn co2_task(
-    mut sensor: SCD30<'static, Twim<'static, peripherals::TWISPI0>>,
-    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
-) {
+pub async fn co2_task(mut sensor: SCD30<'static, Twim<'static, peripherals::TWISPI0>>, app: App) {
     defmt::info!(
         "Scd30: {}",
         defmt::unwrap!(sensor.get_temperature_offset().await)
@@ -54,14 +39,11 @@ pub async fn co2_task(
     loop {
         if let Ok(true) = sensor.get_data_ready().await {
             if let Ok(measurement) = sensor.read_measurement().await {
-                state.lock(|data| {
-                    data.update(|mut state| {
-                        state.co2_concentration = measurement.co2;
-                        state.temperature = measurement.temperature;
-                        state.humidity = measurement.humidity;
-                        state
-                    });
-                });
+                app.update_co2(
+                    measurement.co2,
+                    measurement.temperature,
+                    measurement.humidity,
+                );
                 defmt::info!("Scd30: co2 {}", measurement.co2);
             } else {
                 defmt::error!("Scd30: measurement error.")
@@ -72,10 +54,7 @@ pub async fn co2_task(
 }
 
 #[embassy::task]
-pub async fn pm_task(
-    mut sensor: Sps30<'static, Twim<'static, peripherals::TWISPI0>>,
-    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
-) {
+pub async fn pm_task(mut sensor: Sps30<'static, Twim<'static, peripherals::TWISPI0>>, app: App) {
     let version = defmt::unwrap!(sensor.read_version().await);
 
     defmt::error!("SPS30: version {:x}", version);
@@ -89,22 +68,8 @@ pub async fn pm_task(
 
         if defmt::unwrap!(sensor.is_ready().await) {
             let measured = defmt::unwrap!(sensor.read_measured_data().await);
-            state.lock(|data| {
-                data.update(|mut state| {
-                    state.mass_pm1_0 = measured.mass_pm1_0;
-                    state.mass_pm2_5 = measured.mass_pm2_5;
-                    state.mass_pm4_0 = measured.mass_pm4_0;
-                    state.mass_pm10 = measured.mass_pm10;
-                    state.number_pm0_5 = measured.number_pm0_5;
-                    state.number_pm1_0 = measured.number_pm1_0;
-                    state.number_pm2_5 = measured.number_pm2_5;
-                    state.number_pm4_0 = measured.number_pm4_0;
-                    state.number_pm10 = measured.number_pm10;
-                    state.typical_particulate_matter_size = measured.typical_size;
-                    state
-                });
-            });
             defmt::info!("SPS30: data: {}", measured);
+            app.update_pm(measured);
         }
     }
 }

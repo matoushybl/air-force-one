@@ -1,7 +1,7 @@
 use defmt::Format;
 use embassy_traits::i2c::{I2c, SevenBitAddress};
 
-use crate::sensirion_i2c::{Error, SensirionCommand, SensirionI2c};
+use crate::drivers::sensirion_i2c::{Error, SensirionCommand, SensirionI2c};
 
 #[repr(u16)]
 pub enum Sps30Command {
@@ -100,13 +100,13 @@ where
         Ok(result == 1)
     }
 
-    pub async fn read_measured_data(&mut self) -> Result<AirInfo, Error<T::Error>> {
+    pub async fn read_measured_data(&mut self) -> Result<PMInfo, Error<T::Error>> {
         let mut buffer: [u8; 60] = [0; 60];
         self.bus
             .read_raw(SENSOR_ADDR, Sps30Command::ReadMeasuredValues, &mut buffer)
             .await?;
 
-        Ok(AirInfo {
+        Ok(PMInfo {
             mass_pm1_0: self.process_data_slice(&buffer[..6]),
             mass_pm2_5: self.process_data_slice(&buffer[6..]),
             mass_pm4_0: self.process_data_slice(&buffer[12..]),
@@ -134,7 +134,7 @@ where
 }
 
 #[derive(Format)]
-pub struct AirInfo {
+pub struct PMInfo {
     /// Mass Concentration PM1.0 [μg/m³]
     pub mass_pm1_0: f32,
     /// Mass Concentration PM2.5 [μg/m³]

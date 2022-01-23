@@ -1,13 +1,12 @@
-use core::cell::Cell;
-
-use embassy::blocking_mutex::{CriticalSectionMutex, Mutex};
 use embassy::time::{Duration, Timer};
 use futures::future::select;
 use futures::pin_mut;
 use nrf_softdevice::ble::peripheral;
 use nrf_softdevice::Softdevice;
 use postcard::to_slice;
-use shared::{AirQuality, AirQualityAdvertisement};
+use shared::AirQualityAdvertisement;
+
+use crate::app::App;
 
 #[embassy::task]
 pub async fn softdevice_task(sd: &'static Softdevice) {
@@ -15,10 +14,7 @@ pub async fn softdevice_task(sd: &'static Softdevice) {
 }
 
 #[embassy::task]
-pub async fn bluetooth_task(
-    sd: &'static Softdevice,
-    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
-) {
+pub async fn bluetooth_task(sd: &'static Softdevice, app: App) {
     #[rustfmt::skip]
     let scan_data = &[
         0x03, 0x03, 0x09, 0x18,
@@ -39,7 +35,7 @@ pub async fn bluetooth_task(
         let mut buffer = [0u8; 31];
         buffer[0] = 0xff;
         buffer[1] = 0xff;
-        let data = state.lock(|cell| AirQualityAdvertisement::from(cell.get()));
+        let data = AirQualityAdvertisement::from(app.air_quality());
 
         defmt::error!("wtf: {:?}", data);
 

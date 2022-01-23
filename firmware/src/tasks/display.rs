@@ -1,8 +1,5 @@
-use core::cell::Cell;
-
 use arrayvec::ArrayString;
 use embassy::blocking_mutex::kind::Noop;
-use embassy::blocking_mutex::{CriticalSectionMutex, Mutex};
 use embassy::channel::mpsc::Receiver;
 use embassy::time::{Duration, Timer};
 use embassy_nrf::peripherals;
@@ -15,48 +12,25 @@ use embedded_graphics::{
     style::TextStyleBuilder,
 };
 use futures::future::{select, Either};
-use shared::AirQuality;
 use ssd1306::prelude::{DisplayRotation, DisplaySize128x32, GraphicsMode};
 use ssd1306::{Builder, I2CDIBuilder};
 
-use crate::{ButtonEvent, Page};
+use crate::app::{App, ButtonEvent, Page};
 
 #[embassy::task]
-pub async fn navigation(
-    mut receiver: Receiver<'static, Noop, ButtonEvent, 1>,
-    page: &'static CriticalSectionMutex<Cell<Page>>,
-) {
+pub async fn navigation(mut receiver: Receiver<'static, Noop, ButtonEvent, 1>, app: App) {
     loop {
         let sel = select(receiver.recv(), Timer::after(Duration::from_secs(10))).await;
         match sel {
-            Either::Left((Some(event), _)) => match event {
-                ButtonEvent::Esc => page.lock(|page| page.set(Page::Basic)),
-                ButtonEvent::Ok => defmt::error!("ok not implemented."),
-                ButtonEvent::Next => page.lock(|page| match page.get() {
-                    Page::Basic => page.set(Page::Pm),
-                    Page::Pm => page.set(Page::Voc),
-                    Page::Voc => page.set(Page::Basic),
-                }),
-                ButtonEvent::Prev => page.lock(|page| match page.get() {
-                    Page::Basic => page.set(Page::Voc),
-                    Page::Pm => page.set(Page::Basic),
-                    Page::Voc => page.set(Page::Pm),
-                }),
-            },
-            Either::Right(_) => {
-                page.lock(|page| page.set(Page::Basic));
-            }
+            Either::Left((Some(event), _)) => app.button_pressed(event),
+            Either::Right(_) => app.button_timed_out(),
             _ => {}
         }
     }
 }
 
 #[embassy::task]
-pub async fn render(
-    twim: Twim<'static, peripherals::TWISPI1>,
-    state: &'static CriticalSectionMutex<Cell<AirQuality>>,
-    page: &'static CriticalSectionMutex<Cell<Page>>,
-) {
+pub async fn render(twim: Twim<'static, peripherals::TWISPI1>, app: App) {
     use core::fmt::Write;
     let interface = I2CDIBuilder::new().init(twim);
     let mut disp: GraphicsMode<_, _> = Builder::new()
@@ -78,8 +52,8 @@ pub async fn render(
         disp.clear();
 
         let mut buf = ArrayString::<[_; 128]>::new();
-        let data = state.lock(|data| data.get());
-        match page.lock(|data| data.get()) {
+        let data = app.air_quality();
+        match app.page() {
             Page::Basic => write!(
                 &mut buf,
                 "Temp: {:.1} C\nHumi: {:.1} %\nCO2:  {:.0} ppm",
@@ -96,6 +70,16 @@ pub async fn render(
                 &mut buf,
                 "size: {:.1}\nvoc:  {}",
                 data.typical_particulate_matter_size, data.voc_index,
+            )
+            .unwrap(),
+            Page::Settings => write!(
+                &mut buf,
+                "bzzz: {}",
+                "ON" // if (unsafe { Uicr::read(0) } & 0x01) > 0 {
+                     //     "ON"
+                     // } else {
+                     //     "OFF"
+                     // }
             )
             .unwrap(),
         }

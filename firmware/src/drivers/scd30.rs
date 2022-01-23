@@ -1,6 +1,6 @@
 use embassy::traits::i2c::{I2c, SevenBitAddress};
 
-use crate::sensirion_i2c::{Error, SensirionCommand, SensirionI2c};
+use crate::drivers::sensirion_i2c::{Error, SensirionCommand, SensirionI2c};
 
 const SENSOR_ADDR: u8 = 0x61;
 

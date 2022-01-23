@@ -4,15 +4,10 @@
 #![allow(incomplete_features)]
 #![feature(cell_update)]
 
-pub mod tasks;
-
-pub mod scd30;
-
+pub mod app;
 pub mod board;
-pub mod sensirion_i2c;
-pub mod sgp40;
-pub mod sps30;
-pub mod vocalg;
+pub mod drivers;
+pub mod tasks;
 
 use core::alloc::Layout;
 #[allow(unused)]
@@ -64,20 +59,6 @@ pub type StaticUsb = Usbd<UsbBus<'static, USBD>>;
 pub type StaticSerialClassSet1 = ClassSet1<StaticUsb, UsbSerial<'static, 'static, StaticUsb>>;
 pub type Usb =
     embassy_hal_common::usb::Usb<'static, StaticUsb, StaticSerialClassSet1, interrupt::USBD>;
-
-pub enum ButtonEvent {
-    Esc,
-    Ok,
-    Next,
-    Prev,
-}
-
-#[derive(Clone, Copy)]
-pub enum Page {
-    Basic,
-    Pm,
-    Voc,
-}
 
 pub fn softdevice_config() -> nrf_softdevice::Config {
     nrf_softdevice::Config {
