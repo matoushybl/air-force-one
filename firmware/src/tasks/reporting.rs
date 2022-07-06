@@ -30,7 +30,7 @@ pub async fn task(
 
         if count >= 10 {
             if app.bzzz_enabled() {
-                buzz.set_high();
+                // buzz.set_high();
             }
             Timer::after(Duration::from_millis(200)).await;
             buzz.set_low();

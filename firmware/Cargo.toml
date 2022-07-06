@@ -4,6 +4,7 @@ authors = ["Matous Hybl <hyblmatous@gmail.com>"]
 name = "air-force-one"
 edition = "2021"
 version = "0.1.0"
+resolver = "2"
 
 [features]
 default = ["persist-panic"]
@@ -48,6 +49,8 @@ futures = { version = "0.3.17", default-features = false, features = ["async-awa
 postcard = "0.7.2"
 shared = { path = "../shared", features = ["defmt_format"] }
 # nrf-smartled = { version = "0.4.0", features = ["52840"]}
+
+# drogue-device = { git = "https://github.com/drogue-iot/drogue-device.git", default-features = false }
 
 fixed = "1"
 fixed-sqrt = "0.2"
