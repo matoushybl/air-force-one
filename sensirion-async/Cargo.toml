@@ -1,0 +1,14 @@
+[package]
+name = "sensirion-async"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embedded-hal-async = { version = "0.1.0-alpha.1" }
+defmt = { version = "0.3", optional = true }
+
+crc_all = "0.2.0"
+fixed = "1"
+fixed-sqrt = "0.2"
+
+getset = "0.1.2"

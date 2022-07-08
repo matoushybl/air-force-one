@@ -1,0 +1,51 @@
+[package]
+name = "example-embassy-nrf"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2e7bc", default-features = false, features = ["defmt", "time", "nightly", "unstable-traits"] }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2e7bc", default-features = false, features = ["defmt", "nrf52840", "gpiote", "time-driver-rtc1", "nightly", "unstable-traits"] }
+
+cortex-m = { version = "0.7.2" }
+cortex-m-rt = "0.7"
+
+defmt = { version = "0.3" }
+defmt-rtt = { version = "0.3" }
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+
+sensirion-async = { path = "../../../sensirion-async", features = ["defmt"] }
+
+[profile.dev]
+codegen-units = 1
+debug = 2
+debug-assertions = true
+incremental = false
+opt-level = 3
+overflow-checks = true
+
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = "fat"
+opt-level = 's'
+overflow-checks = false
+
+# do not optimize proc-macro crates = faster builds from scratch
+[profile.dev.build-override]
+codegen-units = 8
+debug = 2
+debug-assertions = false
+opt-level = 0
+overflow-checks = false
+
+[profile.release.build-override]
+codegen-units = 8
+debug = 2
+debug-assertions = false
+opt-level = 0 
+overflow-checks = false
