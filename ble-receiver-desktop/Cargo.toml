@@ -7,14 +7,15 @@ edition = "2021"
 
 
 [patch.crates-io]
-btleplug = { git = "https://github.com/subtle-supernova/btleplug.git", branch = "macos12-filters"}
+btleplug = { git = "https://github.com/deviceplug/btleplug.git", branch = "master" }
 
 [dependencies]
 tokio = { version = "1.10.0", features = ["full"] }
 btleplug = { version = "0.9.0" }
 futures = "0.3.16"
-tokio-stream = { version = "0.1", features = ["sync"]}
+tokio-stream = { version = "0.1", features = ["sync"] }
 log = "0.4.14"
 pretty_env_logger = "0.4"
 shared = { path = "../shared", features = ["std"] }
 postcard = "0.7.2"
+telegraf = "*"
