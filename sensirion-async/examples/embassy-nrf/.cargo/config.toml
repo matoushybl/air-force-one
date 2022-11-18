@@ -7,9 +7,11 @@ runner = "probe-run --chip nrf52840_xxAA"
 
 rustflags = [
   # Code-size optimizations.
-  "-Z", "trap-unreachable=no",
+  "-Z",
+  "trap-unreachable=no",
   #"-C", "no-vectorize-loops",
-  "-C", "force-frame-pointers=yes",
+  "-C",
+  "force-frame-pointers=yes",
 ]
 
 [build]

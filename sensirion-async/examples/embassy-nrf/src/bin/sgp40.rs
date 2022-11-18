@@ -1,21 +1,22 @@
 #![no_std]
 #![no_main]
-#![feature(generic_associated_types)]
 #![feature(type_alias_impl_trait)]
 
+use embassy_nrf::config::Config;
 use embassy_nrf::gpio::Output;
 use embassy_nrf::twim::Twim;
 
-use embassy::executor::Spawner;
-use embassy::time::{Delay, Duration, Timer};
-use embassy_nrf::{interrupt, Peripherals};
+use embassy_executor::Spawner;
+use embassy_nrf::interrupt;
+use embassy_time::{Delay, Duration, Timer};
 use interrupt::InterruptExt;
 
 use example_embassy_nrf as _;
 use sensirion_async::sgp40::Sgp40;
 
-#[embassy::main]
-async fn main(_spawner: Spawner, p: Peripherals) {
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
+    let p = embassy_nrf::init(Config::default());
     let mut led = Output::new(
         p.P1_10,
         embassy_nrf::gpio::Level::Low,

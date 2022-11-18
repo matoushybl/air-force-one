@@ -6,11 +6,33 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2e7bc", default-features = false, features = ["defmt", "time", "nightly", "unstable-traits"] }
-embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2e7bc", default-features = false, features = ["defmt", "nrf52840", "gpiote", "time-driver-rtc1", "nightly", "unstable-traits"] }
 
-cortex-m = { version = "0.7.2" }
-cortex-m-rt = "0.7"
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", features = [
+    "defmt",
+] }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", features = [
+    "defmt",
+    "nightly",
+    "integrated-timers",
+] }
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", features = [
+    "defmt",
+    "unstable-traits",
+    "nightly",
+    "defmt-timestamp-uptime",
+] }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", default-features = false, features = [
+    "defmt",
+    "nrf52840",
+    "gpiote",
+    "time-driver-rtc1",
+    "nightly",
+    "unstable-traits",
+] }
+
+cortex-m = { version = "0.7.6", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7.0"
 
 defmt = { version = "0.3" }
 defmt-rtt = { version = "0.3" }
@@ -47,5 +69,5 @@ overflow-checks = false
 codegen-units = 8
 debug = 2
 debug-assertions = false
-opt-level = 0 
+opt-level = 0
 overflow-checks = false

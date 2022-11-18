@@ -3,6 +3,7 @@
 #![feature(type_alias_impl_trait)]
 
 pub mod scd30;
+pub mod scd4x;
 pub mod sgp40;
 pub mod sps30;
 mod vocalg;
@@ -101,6 +102,21 @@ where
         buffer[2..4].copy_from_slice(&word.to_be_bytes());
 
         buffer[4] = self.crc.calculate(&buffer[2..4]);
+
+        self.bus.write(address, &buffer).await?;
+
+        Ok(())
+    }
+
+    pub async fn write_command(
+        &mut self,
+        address: u8,
+        command: impl SensirionCommand,
+    ) -> Result<(), Error<T::Error>> {
+        let mut buffer = [0u8; 3];
+
+        buffer[0..2].copy_from_slice(&command.raw().to_be_bytes());
+        buffer[2] = self.crc.calculate(&buffer[0..2]);
 
         self.bus.write(address, &buffer).await?;
 
