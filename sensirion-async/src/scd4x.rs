@@ -4,6 +4,7 @@ use crate::{Error, SensirionCommand, SensirionI2c};
 
 const SENSOR_ADDR: u8 = 0x62;
 
+#[allow(unused)]
 enum Command {
     StartPeriodicMeasurement,
     StopPeriodicMeasurement,
@@ -147,6 +148,7 @@ where
             .read_raw(SENSOR_ADDR, Command::ReadMeasurement, &mut result)
             .await?;
 
+        #[cfg(feature = "defmt")]
         defmt::error!("result: {:x}", result);
 
         let raw_temp = u16::from_be_bytes(result[3..5].try_into().unwrap());

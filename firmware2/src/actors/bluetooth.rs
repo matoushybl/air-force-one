@@ -1,17 +1,15 @@
-use core::num::Wrapping;
-
 use ector::{actor, Actor, Address, Inbox};
-use embassy::time::{Duration, Timer};
-use embassy::util::{select, Either};
+
+use embassy_futures::select::{select, Either};
 use embassy_nrf::usb::SignalledSupply;
 use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::Softdevice;
-use nrf_softdevice::{gatt_server, raw};
+
 use postcard::to_slice;
 
 use crate::models::AirQuality;
 
-#[embassy::task]
+#[embassy_executor::task]
 pub async fn softdevice_task(sd: &'static Softdevice, supply: &'static SignalledSupply) {
     unsafe {
         nrf_softdevice::raw::sd_power_usbdetected_enable(1);
@@ -31,28 +29,21 @@ pub async fn softdevice_task(sd: &'static Softdevice, supply: &'static Signalled
     .await;
 }
 
-#[nrf_softdevice::gatt_service(uuid = "180f")]
-pub struct BatteryService {
-    #[characteristic(uuid = "2a19", read, notify)]
-    battery_level: u8,
-}
+// #[nrf_softdevice::gatt_service(uuid = "180f")]
+// pub struct BatteryService {
+//     #[characteristic(uuid = "2a19", read, notify)]
+//     battery_level: u8,
+// }
 
-#[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
-pub struct FooService {
-    #[characteristic(
-        uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38",
-        read,
-        write,
-        notify,
-        indicate
-    )]
-    foo: u16,
+#[nrf_softdevice::gatt_service(uuid = "181a")]
+pub struct EnvironmentalService {
+    #[characteristic(uuid = "2a6e", read, notify)]
+    temperature: u16,
 }
 
 #[nrf_softdevice::gatt_server]
 pub struct Server {
-    bas: BatteryService,
-    foo: FooService,
+    environment: EnvironmentalService,
 }
 
 pub struct Ble {
@@ -68,8 +59,7 @@ impl Actor for Ble {
     where
         M: Inbox<Self::Message<'m>> + 'm,
     {
-        let mut battery_level = Wrapping(0u8);
-        let mut notifications_enabled = false;
+        let mut environmental_notifications_enabled = false;
         loop {
             let config = peripheral::Config::default();
 
@@ -78,7 +68,7 @@ impl Actor for Ble {
 
             let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
                 adv_data: &adv_data[..adv_len],
-                scan_data: &[0x03, 0x03, 0x09, 0x18],
+                scan_data: &[0x03, 0x03, 0x1a, 0x18],
             };
 
             match select(
@@ -93,40 +83,24 @@ impl Actor for Ble {
                     defmt::info!("advertising done!");
 
                     loop {
-                        battery_level += 1;
-                        if notifications_enabled {
-                            defmt::unwrap!(self
-                                .server
-                                .bas
-                                .battery_level_notify(&conn, battery_level.0));
+                        if environmental_notifications_enabled {
+                            defmt::unwrap!(self.server.environment.temperature_notify(
+                                &conn,
+                                &((self.air_quality.temperature.0 * 100.0) as u16)
+                            ));
                         } else {
-                            defmt::unwrap!(self.server.bas.battery_level_set(battery_level.0));
+                            defmt::unwrap!(self.server.environment.temperature_set(
+                                &((self.air_quality.temperature.0 * 100.0) as u16)
+                            ));
                         }
 
                         // Run the GATT server on the connection. This returns when the connection gets disconnected.
                         let server = gatt_server::run(&conn, &self.server, |e| match e {
-                            ServerEvent::Bas(e) => match e {
-                                BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
-                                    defmt::info!("battery notifications: {}", notifications);
-                                    notifications_enabled = notifications;
-                                }
-                            },
-                            ServerEvent::Foo(e) => match e {
-                                FooServiceEvent::FooWrite(val) => {
-                                    defmt::info!("wrote foo: {}", val);
-                                    if let Err(e) = self.server.foo.foo_notify(&conn, val + 1) {
-                                        defmt::info!("send notification error: {:?}", e);
-                                    }
-                                }
-                                FooServiceEvent::FooCccdWrite {
-                                    indications,
+                            ServerEvent::Environment(e) => match e {
+                                EnvironmentalServiceEvent::TemperatureCccdWrite {
                                     notifications,
                                 } => {
-                                    defmt::info!(
-                                        "foo indications: {}, notifications: {}",
-                                        indications,
-                                        notifications
-                                    )
+                                    environmental_notifications_enabled = notifications;
                                 }
                             },
                         });
@@ -145,7 +119,6 @@ impl Actor for Ble {
                     }
                 }
                 Either::Second(air_quality) => {
-                    defmt::error!("new aq");
                     self.air_quality = air_quality;
                 }
             }
@@ -161,7 +134,7 @@ fn build_adv_data(air_quality: &AirQuality, adv_data: &mut [u8; 31]) -> usize {
         0x01,
         &[nrf_softdevice::raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8],
     );
-    adv_offset += fill_adv_data(&mut adv_data[adv_offset..], 0x03, &[0x09, 0x18]);
+    adv_offset += fill_adv_data(&mut adv_data[adv_offset..], 0x03, &[0x1a, 0x18]);
     adv_offset += fill_adv_data(&mut adv_data[adv_offset..], 0x09, &[b'A', b'F', b'O']);
 
     let mut buffer = [0u8; 31];
@@ -205,7 +178,7 @@ impl From<AirQuality> for AirQualityAdvertisement {
             mass_pm2_5: raw.pm.mass_25 as u16,
             mass_pm4_0: raw.pm.mass_40 as u16,
             mass_pm10: raw.pm.mass_100 as u16,
-            voc_index: raw.voc.index as u16,
+            voc_index: raw.voc.index,
         }
     }
 }

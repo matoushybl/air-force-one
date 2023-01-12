@@ -19,7 +19,7 @@ use example_embassy_nrf as _;
 async fn main(_spawner: Spawner) {
     let p = embassy_nrf::init(Config::default());
     let mut led = Output::new(
-        p.P0_13,
+        p.P1_15,
         embassy_nrf::gpio::Level::Low,
         embassy_nrf::gpio::OutputDrive::Standard,
     );
@@ -29,7 +29,7 @@ async fn main(_spawner: Spawner) {
     config.frequency = twim::Frequency::K100;
     config.scl_pullup = true;
     config.sda_pullup = true;
-    let twi = Twim::new(p.TWISPI0, irq, p.P0_26, p.P0_02, config);
+    let twi = Twim::new(p.TWISPI0, irq, p.P0_12, p.P0_13, config);
     let mut sensor = Scd4x::new(twi);
 
     defmt::unwrap!(sensor.stop_periodic_measurement().await);

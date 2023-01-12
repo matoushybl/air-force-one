@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 #![macro_use]
-#![feature(generic_associated_types)]
 #![feature(type_alias_impl_trait)]
 
 use embassy_nrf::interrupt;
@@ -24,6 +23,7 @@ fn panic_defmt() -> ! {
 }
 
 pub mod actors;
+pub mod drivers;
 pub mod models;
 
 use defmt_rtt as _;
@@ -34,9 +34,9 @@ pub fn softdevice_config() -> nrf_softdevice::Config {
     nrf_softdevice::Config {
         clock: Some(raw::nrf_clock_lf_cfg_t {
             source: raw::NRF_CLOCK_LF_SRC_RC as u8,
-            rc_ctiv: 4,
+            rc_ctiv: 16,
             rc_temp_ctiv: 2,
-            accuracy: 7,
+            accuracy: raw::NRF_CLOCK_LF_ACCURACY_250_PPM as u8,
         }),
         conn_gap: Some(raw::ble_gap_conn_cfg_t {
             conn_count: 6,

@@ -1,42 +1,56 @@
 use core::future::Future;
-use drogue_device::traits;
 use ector::{Actor, Address, Inbox};
 
-pub use drogue_device::traits::button::Event as ButtonEvent;
-use embassy::time::{Duration, Timer};
+use embassy_time::{Duration, Timer};
+use embedded_hal::digital::InputPin;
+use embedded_hal_async::digital::Wait;
 
-//pub struct Button<P: Wait + InputPin, H: ButtonEventHandler> {
-pub struct Button<P: traits::button::Button, H: 'static> {
-    inner: P,
-    handler: Address<H>,
+pub struct Button<B, T>
+where
+    T: 'static,
+{
+    button: B,
+    released_value: T,
+    handler: Address<T>,
 }
 
-//impl<P: Wait + InputPin, H: ButtonEventHandler> Button<P, H> {
-impl<P: traits::button::Button, H> Button<P, H>
+impl<B, T> Button<B, T>
 where
-    H: 'static,
+    B: Wait + InputPin,
 {
-    pub fn new(inner: P, handler: Address<H>) -> Self {
-        Self { inner, handler }
+    pub fn new(button: B, released_value: T, handler: Address<T>) -> Self {
+        Self {
+            button,
+            released_value,
+            handler,
+        }
     }
 }
 
-impl<P: traits::button::Button, H> Actor for Button<P, H>
+impl<B, T> Actor for Button<B, T>
 where
-    H: Default + 'static,
+    B: Wait + InputPin,
+    T: Copy + 'static,
 {
-    type Message<'m> = ();
-    type OnMountFuture<'m, M> = impl Future<Output = ()> + 'm where Self: 'm, M: Inbox<()> + 'm;
-    fn on_mount<'m, M>(&'m mut self, _: Address<()>, _: M) -> Self::OnMountFuture<'m, M>
+    type Message<'m> = T where Self: 'm;
+
+    type OnMountFuture<'m, M>= impl Future<Output = ()> + 'm where Self: 'm, M: Inbox<Self::Message<'m>> + 'm;
+
+    fn on_mount<'m, M>(
+        &'m mut self,
+        _: Address<Self::Message<'m>>,
+        _: M,
+    ) -> Self::OnMountFuture<'m, M>
     where
-        M: Inbox<()> + 'm,
+        M: Inbox<Self::Message<'m>> + 'm,
     {
         async move {
             loop {
-                self.inner.wait_released().await;
+                self.button.wait_for_any_edge().await.ok();
+                if self.button.is_high().unwrap_or(false) {
+                    self.handler.try_notify(self.released_value).ok();
+                }
                 Timer::after(Duration::from_millis(10)).await;
-
-                self.handler.try_notify(H::default()).ok();
             }
         }
     }

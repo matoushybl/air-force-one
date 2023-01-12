@@ -1,10 +1,10 @@
 #![cfg_attr(not(test), no_std)]
-#![feature(generic_associated_types)]
 #![feature(type_alias_impl_trait)]
 
 pub mod scd30;
 pub mod scd4x;
 pub mod sgp40;
+pub mod sht4x;
 pub mod sps30;
 mod vocalg;
 

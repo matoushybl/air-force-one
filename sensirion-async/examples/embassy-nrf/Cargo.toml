@@ -7,22 +7,22 @@ edition = "2021"
 
 [dependencies]
 
-embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab" }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", features = [
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "42f1b3ac74f451230f657bbe148efce7b9924577" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "42f1b3ac74f451230f657bbe148efce7b9924577", features = [
     "defmt",
 ] }
-embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", features = [
+embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "42f1b3ac74f451230f657bbe148efce7b9924577", features = [
     "defmt",
     "nightly",
     "integrated-timers",
 ] }
-embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", features = [
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "42f1b3ac74f451230f657bbe148efce7b9924577", features = [
     "defmt",
     "unstable-traits",
     "nightly",
     "defmt-timestamp-uptime",
 ] }
-embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "aabc02506bcbd762552660a0b45cda6e15787cab", default-features = false, features = [
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "42f1b3ac74f451230f657bbe148efce7b9924577", default-features = false, features = [
     "defmt",
     "nrf52840",
     "gpiote",

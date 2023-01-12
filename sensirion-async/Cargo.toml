@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-embedded-hal-async = { version = "0.1.0-alpha.1" }
+embedded-hal-async = { version = "0.2.0-alpha.0" }
 defmt = { version = "0.3", optional = true }
 
 crc_all = "0.2.0"

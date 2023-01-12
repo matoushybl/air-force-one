@@ -1,10 +1,10 @@
 use ector::{actor, Actor, Address, Inbox};
-use embassy::blocking_mutex::raw::ThreadModeRawMutex;
-use embassy::time::Duration;
-use embassy::time::Timer;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_nrf::peripherals;
 use embassy_nrf::twim::Twim;
+use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_time::Duration;
+use embassy_time::Timer;
 use sensirion_async::scd30::Scd30;
 
 use crate::models::{Humidity, Temperature};

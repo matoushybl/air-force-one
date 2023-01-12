@@ -1,6 +1,8 @@
+use embassy_time::Duration;
+
 use ector::{actor, Actor, Address, Inbox};
-use embassy::time::{Duration, Timer};
 use embassy_nrf::gpio::{AnyPin, Output};
+use embassy_time::Timer;
 
 pub struct Buzzer {
     buzzer: Output<'static, AnyPin>,

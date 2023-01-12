@@ -1,28 +1,43 @@
-use drogue_device::actors::led::LedMessage;
-use ector::{actor, Actor, Address, Inbox};
-use embassy::time::{Duration, Timer};
+use ector::{Actor, Address, Inbox};
+use embassy_time::{Duration, Timer};
+use futures::Future;
 
-pub struct Emitter {
-    collector: Address<LedMessage>,
+pub struct Emitter<T>
+where
+    T: 'static,
+{
+    collector: Address<T>,
+    value: T,
 }
 
-impl Emitter {
-    pub fn new(collector: Address<LedMessage>) -> Self {
-        Self { collector }
+impl<T> Emitter<T> {
+    pub fn new(collector: Address<T>, value: T) -> Self {
+        Self { collector, value }
     }
 }
 
-#[actor]
-impl Actor for Emitter {
-    type Message<'m> = LedMessage;
+impl<T> Actor for Emitter<T>
+where
+    T: Copy + 'static,
+{
+    type OnMountFuture<'m, M>
+    = impl Future<Output = ()> + 'm where Self: 'm, M: Inbox<Self::Message<'m>> + 'm;
 
-    async fn on_mount<M>(&mut self, _: Address<Self::Message<'m>>, _: M)
+    type Message<'m> = T where Self: 'm;
+
+    fn on_mount<'m, M>(
+        &'m mut self,
+        _: Address<Self::Message<'m>>,
+        _: M,
+    ) -> Self::OnMountFuture<'m, M>
     where
         M: Inbox<Self::Message<'m>> + 'm,
     {
-        loop {
-            // self.collector.notify(LedMessage::Toggle).await;
-            Timer::after(Duration::from_millis(500)).await;
+        async move {
+            loop {
+                self.collector.notify(self.value).await;
+                Timer::after(Duration::from_millis(500)).await;
+            }
         }
     }
 }

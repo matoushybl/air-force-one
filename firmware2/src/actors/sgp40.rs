@@ -1,11 +1,11 @@
 use ector::{actor, Actor, Address, Inbox};
-use embassy::blocking_mutex::raw::ThreadModeRawMutex;
-use embassy::time::Ticker;
-use embassy::time::{Delay, Duration};
-use embassy::util::{select, Either};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
+use embassy_futures::select::{select, Either};
 use embassy_nrf::peripherals;
 use embassy_nrf::twim::Twim;
+use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_time::Ticker;
+use embassy_time::{Delay, Duration};
 use futures::StreamExt;
 use sensirion_async::sgp40::Sgp40;
 
