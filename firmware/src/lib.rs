@@ -1,72 +1,34 @@
 #![no_std]
+#![no_main]
+#![macro_use]
 #![feature(type_alias_impl_trait)]
-#![feature(alloc_error_handler)]
-#![allow(incomplete_features)]
-#![feature(cell_update)]
 
-pub mod app;
-pub mod board;
-pub mod drivers;
-pub mod tasks;
-
-use core::alloc::Layout;
-#[allow(unused)]
-use core::panic::PanicInfo;
-use core::sync::atomic::{AtomicUsize, Ordering};
-
-use alloc_cortex_m::CortexMHeap;
-use embassy_hal_common::usb::usb_serial::UsbSerial;
-use embassy_hal_common::usb::ClassSet1;
 use embassy_nrf::interrupt;
-use embassy_nrf::peripherals::USBD;
-use embassy_nrf::usb::UsbBus;
-use nrf_softdevice::raw;
-use nrf_softdevice_defmt_rtt as _; // global logger
-
-use nrf_usbd::Usbd;
-
-#[cfg(not(feature = "persist-panic"))]
+#[cfg(feature = "panic-probe")]
 use panic_probe as _;
 
-use nrf_softdevice as _;
+#[cfg(feature = "panic-persist")]
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    panic_persist::report_panic_info(info);
 
-// same panicking *behavior* as `panic-probe` but doesn't print a panic message
-// this prevents the panic message being printed *twice* when `defmt::panic` is invoked
-#[defmt::panic_handler]
-fn panic_defmt() -> ! {
     cortex_m::asm::udf()
 }
 
-static COUNT: AtomicUsize = AtomicUsize::new(0);
-defmt::timestamp!("{=usize}", {
-    // NOTE(no-CAS) `timestamps` runs with interrupts disabled
-    let n = COUNT.load(Ordering::Relaxed);
-    COUNT.store(n + 1, Ordering::Relaxed);
-    n
-});
+pub mod actors;
+pub mod drivers;
 
-// this is the allocator the application will use
-#[global_allocator]
-static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
-
-// define what happens in an Out Of Memory (OOM) condition
-#[alloc_error_handler]
-fn alloc_error(_layout: Layout) -> ! {
-    panic!("Alloc error");
-}
-
-pub type StaticUsb = Usbd<UsbBus<'static, USBD>>;
-pub type StaticSerialClassSet1 = ClassSet1<StaticUsb, UsbSerial<'static, 'static, StaticUsb>>;
-pub type Usb =
-    embassy_hal_common::usb::Usb<'static, StaticUsb, StaticSerialClassSet1, interrupt::USBD>;
+use defmt_rtt as _;
+use nrf_softdevice as _;
+use nrf_softdevice::raw;
 
 pub fn softdevice_config() -> nrf_softdevice::Config {
     nrf_softdevice::Config {
         clock: Some(raw::nrf_clock_lf_cfg_t {
             source: raw::NRF_CLOCK_LF_SRC_RC as u8,
-            rc_ctiv: 4,
+            rc_ctiv: 16,
             rc_temp_ctiv: 2,
-            accuracy: 7,
+            accuracy: raw::NRF_CLOCK_LF_ACCURACY_250_PPM as u8,
         }),
         conn_gap: Some(raw::ble_gap_conn_cfg_t {
             conn_count: 6,
@@ -96,14 +58,6 @@ pub fn softdevice_config() -> nrf_softdevice::Config {
     }
 }
 
-#[cfg(feature = "persist-panic")]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    panic_persist::report_panic_info(info);
-
-    cortex_m::asm::udf()
-}
-
 pub fn embassy_config() -> embassy_nrf::config::Config {
     let mut config = embassy_nrf::config::Config::default();
     config.hfclk_source = embassy_nrf::config::HfclkSource::Internal;
@@ -114,7 +68,7 @@ pub fn embassy_config() -> embassy_nrf::config::Config {
     config
 }
 
-/// Reinitializes reset pin in the hardware.
+// Reinitializes reset pin in the hardware.
 ///
 /// # Examples
 ///

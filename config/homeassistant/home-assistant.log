@@ -1,0 +1,3 @@
+2023-05-06 22:38:23.604 WARNING (Recorder) [homeassistant.components.recorder.util] The system could not validate that the sqlite3 database at //config/home-assistant_v2.db was shutdown cleanly
+2023-05-06 22:38:23.635 WARNING (Recorder) [homeassistant.components.recorder.util] Ended unfinished session (id=3 from 2023-05-06 14:12:46.723984)
+2023-05-06 22:38:24.479 ERROR (MainThread) [homeassistant.components.homeassistant_alerts] Error requesting homeassistant_alerts data: Cannot connect to host alerts.home-assistant.io:443 ssl:default [Name does not resolve]

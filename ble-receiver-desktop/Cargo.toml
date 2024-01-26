@@ -3,19 +3,19 @@ name = "ble-receiver-desktop"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-
 [patch.crates-io]
 btleplug = { git = "https://github.com/deviceplug/btleplug.git", branch = "master" }
 
 [dependencies]
 tokio = { version = "1.10.0", features = ["full"] }
-btleplug = { version = "0.9.0" }
+btleplug = { version = "0.10.0" }
 futures = "0.3.16"
 tokio-stream = { version = "0.1", features = ["sync"] }
 log = "0.4.14"
 pretty_env_logger = "0.4"
-shared = { path = "../shared", features = ["std"] }
+afo-shared = { path = "../afo-shared" }
 postcard = "0.7.2"
 telegraf = "*"
+serde = "1"
+rumqttc = "0.20.0"
+eyre = "0.6.8"

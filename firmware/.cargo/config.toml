@@ -1,10 +1,19 @@
+[unstable]
+build-std = ["core"]
+build-std-features = ["panic_immediate_abort"]
+
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
-# TODO(2) replace `$CHIP` with your chip's name (see `probe-run --list-chips` output)
-runner = "probe-run --chip nRF52840_xxAA"
+runner = "probe-run --chip nrf52840_xxAA"
+
+rustflags = [
+  # Code-size optimizations.
+  "-Z", "trap-unreachable=no",
+  #"-C", "no-vectorize-loops",
+  "-C", "force-frame-pointers=yes",
+]
 
 [build]
 target = "thumbv7em-none-eabihf"
 
-[alias]
-rb = "run --bin"
-rrb = "run --release --bin"
+[env]
+DEFMT_LOG = "info"

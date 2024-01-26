@@ -10,7 +10,7 @@ use afo_fw::actors::scd4x::{Scd4xData, Scd4xReader};
 use afo_fw::actors::transformer::Transformer;
 
 use afo_shared::AirQuality;
-use embassy_nrf::gpio::{Input, Output, Pull};
+use embassy_nrf::gpio::{Output, Input, Pull};
 use embassy_nrf::usb::SoftwareVbusDetect;
 use sensirion_async::scd4x::Scd4x;
 use static_cell::StaticCell;
@@ -140,32 +140,21 @@ async fn main(spawner: Spawner) {
         .spawn(actors::bluetooth::softdevice_task(sd, supply))
         .unwrap();
 
-    let id_pin = Input::new(p.P0_28, Pull::Up);
-    // First read was 0
-    Timer::after(Duration::from_millis(100)).await;
-
-    let device_id = if id_pin.is_low() { 0 } else { 1 };
-
-    defmt::info!("Starting with device id: {}", device_id);
+    let id_pin = Input::new(p.P0_00, Pull::Up);
 
     let ble = spawn_actor!(
         spawner,
         BLE,
         actors::bluetooth::Ble,
-        actors::bluetooth::Ble {
-            softdevice: sd,
-            server,
-            air_quality: AirQuality::default(),
-            device_id,
-        }
+        actors::bluetooth::Ble {softdevice:sd,server,air_quality:AirQuality::default(), device_id: if id_pin.is_low() { 0 } else { 1 } }
     );
 
     REACTOR.mount(spawner, Reactor::new(Some(ble), None, None));
 
     loop {
         led.set_high();
-        Timer::after(Duration::from_millis(50)).await;
+        Timer::after(Duration::from_millis(200)).await;
         led.set_low();
-        Timer::after(Duration::from_secs(60)).await;
+        Timer::after(Duration::from_millis(200)).await;
     }
 }
