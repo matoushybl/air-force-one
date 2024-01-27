@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "bridge-fw",
+    "shared",
+    "node-fw",
+]
+
+resolver = "2"
+
+# cargo build/run --release
+[profile.release]
+codegen-units = 1
+debug = true
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false
+

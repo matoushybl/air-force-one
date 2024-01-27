@@ -1,0 +1,34 @@
+[package]
+name = "air-force-one-node-fw"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+dev = ["panic-probe"]
+
+[dependencies]
+defmt = { version = "0.3" }
+defmt-rtt = { version = "0.4" }
+panic-probe = { version = "0.3", features = ["print-defmt"], optional = true }
+
+embassy-executor = { version = "0.5.0", features = ["nightly", "arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"]}
+embassy-time = { version = "0.3.0", features = ["defmt", "defmt-timestamp-uptime"]}
+embassy-sync = { version = "0.5.0" }
+embassy-net = { version = "0.4.0", features = ["defmt", "tcp", "dhcpv4", "medium-ethernet"] }
+embassy-usb = { version = "0.1.0", features = ["defmt"] }
+embassy-nrf = { version = "0.1.0", features = ["defmt", "gpiote", "time-driver-rtc1", "nrf52840", "time", "unstable-pac" ]}
+
+nrf-softdevice = { version = "0.1.0", features = ["defmt", "nrf52840", "s140", "ble-peripheral", "critical-section-impl"] }
+
+sensirion-async = { git = "https://github.com/matoushybl/sensirion-async.git", rev = "54e00fee3d679864ee726a081d75eda205bf3430", features = ["defmt"] }
+shared = { path = "../shared", features = ["defmt"] }
+
+cortex-m = { version = "0.7.7" }
+cortex-m-rt = "0.7.3"
+embedded-hal = { version = "1.0.0"}
+embedded-hal-async = { version = "1.0.0" }
+static_cell = { version = "2.0.0", features = ["nightly"] }
+
+serde = { version = "1", default-features = false }
+postcard = "0.7.2"
+
