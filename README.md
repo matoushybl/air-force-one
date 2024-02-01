@@ -1,5 +1,8 @@
 # Air Force One - a simple air quality measurement system
-
+Air Force One is a simple air quality measurement systems primarily designed to measure CO2 concentration in multiple rooms of a small apartment. 
+It consists of nodes responsible for measuring the data and broadcasting them using BLE advertisements and a bridge which periodically receives the data and publishes them over MQTT for further processing - in this case displaying them in dashboards of Home Assistant.
+An overview of the system can be seen in the following image.
+![overview](img/air-force-one-overview.png)
 
 ## Project structure
 * `node-fw` - firmware for the node
@@ -16,7 +19,8 @@ The hardware was developed to allow for more features in the future so apart fro
 * SHT4x sensor for more precise temperature and humidity measurements (the sensors were either badly wired or damaged on prototype boards, so no support for them was added)
 * broken out pins allowing for some extensibility
 
-The nodes and the bridge do not differ hardware wise, but the prototype bridge didn't have assembled anything other than the nRF52 module, LDO and USB circuitry to save on parts, so no measurement support is available in the bridge firmware.
+The nodes and the bridge do not differ hardware wise, but the prototype bridge didn't have assembled anything other than the nRF52 module, LDO and USB circuitry to save parts, so no measurement support is available in the bridge firmware. The difference between them can be seen in the following image.
+![hardware](img/hardware.jpeg)
 
 For firmware flashing a SWD probe is required. The programming connector on-board is the 10-pin Cortex-M debug connector with 1.27 mm pitch. An example of a usable probe with the same connector is the [hs-probe](https://github.com/probe-rs/hs-probe). 
 
@@ -72,7 +76,6 @@ The bridge expects the broker to run without authentication, which can be achiev
 ```
 listener 1883
 allow_anonymous true
-
 ```
 
 ### Home Assistant
