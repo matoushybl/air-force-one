@@ -10,3 +10,5 @@ docker/volumes/data/telegraf/log/
 docker/volumes/data/influxdb2/data/engine/
 docker/volumes/data/influxdb2/data/influx*
 .DS_Store
+pcb/*-backups
+s140_*_softdevice.hex

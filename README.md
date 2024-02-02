@@ -9,6 +9,7 @@ An overview of the system can be seen in the following image.
 * `bridge-fw` - firmware for the bridge
 * `shared` - shared library for node and bridge firmware
 * `pcb` - design files for the electronics
+* `case` - design files for the case
 
 ## Hardware
 The hardware for this project is based on Nordic's nRF52840 bluetooth enabled MCU. CO2 concentration, temperature and humidity are measured by a Sensirion SCD41 sensor.
@@ -23,6 +24,9 @@ The nodes and the bridge do not differ hardware wise, but the prototype bridge d
 ![hardware](img/hardware.jpeg)
 
 For firmware flashing a SWD probe is required. The programming connector on-board is the 10-pin Cortex-M debug connector with 1.27 mm pitch. An example of a usable probe with the same connector is the [hs-probe](https://github.com/probe-rs/hs-probe). 
+
+There is also a case available fitting the PCB shape.
+![case](img/case.jpg)
 
 ## Firmware
 The firmware for both the node and the bridge is written in Rust and utilizes [embassy](https://embassy.dev) async framework as well as [nrf-softdevice](https://github.com/embassy-rs/nrf-softdevice) for bluetooth support.
@@ -40,6 +44,7 @@ Both of the firmware have their panic behavior configured to automatic reset, fo
 
 ### Node Firmware
 Firmware for the node periodically reads data from the SCD41 sensor and updates Manufacturer Specific Data that are part of BLE advertisement.
+For accessing the SCD41 sensor, the firmware uses the [sensirion-async](https://github.com/matoushybl/sensirion-async) library.
 
 Flashing the firmware can be done in the `node-fw` directory by running `cargo run --release`.
 
