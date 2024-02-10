@@ -1,12 +1,15 @@
 # Air Force One - a simple air quality measurement system
 Air Force One is a simple air quality measurement systems primarily designed to measure CO2 concentration in multiple rooms of a small apartment. 
 It consists of nodes responsible for measuring the data and broadcasting them using BLE advertisements and a bridge which periodically receives the data and publishes them over MQTT for further processing - in this case displaying them in dashboards of Home Assistant.
+There are two types of nodes which differ in used hardware and therefore communication protocol. The project was originally developed with the Bluetooth ones in mind, while the ESP32/WiFi one was added only as an experiment.
+
 An overview of the system can be seen in the following image.
 ![overview](img/air-force-one-overview.png)
 
 ## Project structure
-* `node-fw` - firmware for the node
-* `bridge-fw` - firmware for the bridge
+* `node-fw` - firmware for the Bluetooth node
+* `node-c3` - firmware for the ESP32/WiFi node
+* `bridge-fw` - firmware for the Bluetooth bridge
 * `shared` - shared library for node and bridge firmware
 * `pcb` - design files for the electronics
 * `case` - design files for the case
@@ -52,6 +55,15 @@ Flashing the firmware can be done in the `node-fw` directory by running `cargo r
 Firmware for the bridge scans for available nodes and reads the Manufacturer Specific data part of the node's advertisement. A CDC-NCM bridge is utilized to establish a connection to a MQTT broker. Data read from the scans are then published via the broker. Static IP addresses are utilized in this configuration.
 
 Flashing the firmware can be done in the `bridge-fw` directory by running `cargo run --release`.
+
+## Experimental ESP32/WiFi node
+As an experiment a node based on ESP32-C3 was developed. The firmware for this node is written using a similar technological stack as the nRf52 firmware - Rust and embassy. The firmware is located in the `node-c3` directory. A defining difference is that this node directly accesses the MQTT broker, making it much more simpler and hopefully more reliable.
+
+This node also utilizes off-the-shelf hardware, so no custom PCB is requried. In this case [this ESP32-C3 board](https://www.laskakit.cz/laskkit-esp-12-board/?variantId=10482) [this SCD41 breakout board](https://www.laskakit.cz/laskakit-scd41-senzor-co2--teploty-a-vlhkosti-vzduchu/) were used, but any development kits should work the same (apart from assigning pins for the I2C).
+
+When building the firmware SSID, password and MQTT broker address must be set as environent variables. Refer to the respective `main.rs` for environment variable names.
+
+> As of time of publishing, the firmware uses unreleased esp-rs crates - `esp-backtrace` and `esp-println` alongside with `espflash` tool. These were used to add support for defmt.
 
 ## Accessing the measured data
 

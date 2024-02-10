@@ -4,6 +4,9 @@ members = [
     "shared",
     "node-fw",
 ]
+exclude = [
+    "node-c3"
+]
 
 resolver = "2"
 
